@@ -252,10 +252,10 @@ function ShipmentDetail({ id, getOneFn, updateFn, deleteFn, addEvFn, delEvFn, on
         <Info label="Carrier">{s.carrier}</Info>
         <Info label="ETA">{s.eta ? new Date(s.eta).toLocaleString() : "—"}</Info>
       </div>
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex items-center gap-2 text-sm flex-wrap">
         <span className="text-slate-600">Status:</span>
         <select value={status} onChange={(e) => setStatus(e.target.value)} className="border rounded px-2 py-1 bg-white">
-          {["Order received","Picked up","In transit","Arrived at port","Out for delivery","Delivered"].map((o) => <option key={o}>{o}</option>)}
+          {STATUS_OPTIONS.map((o) => <option key={o}>{o}</option>)}
         </select>
         <button
           onClick={async () => { await updateFn({ data: { id, patch: { status } } }); qc.invalidateQueries({ queryKey: ["shipment", id] }); onChanged(); }}
@@ -270,12 +270,15 @@ function ShipmentDetail({ id, getOneFn, updateFn, deleteFn, addEvFn, delEvFn, on
       <div>
         <h4 className="font-semibold text-sm mb-2">Timeline events</h4>
         <ul className="space-y-1 mb-3">
-          {q.data.events.map((ev: { id: string; label: string; location: string | null; event_time: string; sequence: number }) => (
+          {q.data.events.map((ev: { id: string; label: string; location: string | null; event_time: string; sequence: number; latitude: number | null; longitude: number | null }) => (
             <li key={ev.id} className="flex items-center gap-2 bg-white border rounded px-3 py-2 text-sm">
               <span className="text-xs text-slate-400 w-6">{ev.sequence}</span>
               <div className="flex-1">
                 <div className="font-medium">{ev.label}</div>
-                <div className="text-xs text-slate-500">{ev.location || "—"} · {new Date(ev.event_time).toLocaleString()}</div>
+                <div className="text-xs text-slate-500">
+                  {ev.location || "—"} · {new Date(ev.event_time).toLocaleString()}
+                  {ev.latitude != null && ev.longitude != null && <span className="ml-1 text-slate-400">({ev.latitude.toFixed(3)}, {ev.longitude.toFixed(3)})</span>}
+                </div>
               </div>
               <button onClick={async () => { await delEvFn({ data: { id: ev.id } }); qc.invalidateQueries({ queryKey: ["shipment", id] }); }} className="text-xs text-red-600">Remove</button>
             </li>
@@ -285,17 +288,36 @@ function ShipmentDetail({ id, getOneFn, updateFn, deleteFn, addEvFn, delEvFn, on
         <form
           onSubmit={async (e) => {
             e.preventDefault();
-            await addEvFn({ data: { shipment_id: id, label: evLabel, location: evLoc || null, event_time: evTime, sequence: parseInt(evSeq || "0", 10) } });
-            setEvLabel(""); setEvLoc(""); setEvTime(""); setEvSeq(String((q.data.events.length || 0) + 1));
+            const payload: Record<string, unknown> = {
+              shipment_id: id, label: evLabel, location: evLoc || null,
+              event_time: evTime, sequence: parseInt(evSeq || "0", 10),
+            };
+            if (evLat && evLng) {
+              payload.latitude = parseFloat(evLat);
+              payload.longitude = parseFloat(evLng);
+            }
+            await addEvFn({ data: payload });
+            setEvLabel(""); setEvLoc(""); setEvTime(""); setEvLat(""); setEvLng("");
+            setEvSeq(String((q.data.events.length || 0) + 1));
             qc.invalidateQueries({ queryKey: ["shipment", id] });
           }}
-          className="grid grid-cols-[1fr_1fr_1fr_60px_auto] gap-2 text-sm"
+          className="space-y-2 text-sm"
         >
-          <input required placeholder="Label (e.g. Picked up)" value={evLabel} onChange={(e) => setEvLabel(e.target.value)} className="border rounded px-2 py-1.5" />
-          <input placeholder="Location" value={evLoc} onChange={(e) => setEvLoc(e.target.value)} className="border rounded px-2 py-1.5" />
-          <input type="datetime-local" value={evTime} onChange={(e) => setEvTime(e.target.value)} className="border rounded px-2 py-1.5" />
-          <input type="number" min={0} value={evSeq} onChange={(e) => setEvSeq(e.target.value)} className="border rounded px-2 py-1.5" />
-          <button className="bg-orange-600 text-white px-3 rounded text-sm">Add</button>
+          <div className="grid grid-cols-[1fr_1fr_1fr_70px_auto] gap-2">
+            <select required value={evLabel} onChange={(e) => setEvLabel(e.target.value)} className="border rounded px-2 py-1.5 bg-white">
+              <option value="">— Select status —</option>
+              {STATUS_OPTIONS.map((o) => <option key={o}>{o}</option>)}
+            </select>
+            <input placeholder="Location (e.g. Shanghai Port)" value={evLoc} onChange={(e) => setEvLoc(e.target.value)} className="border rounded px-2 py-1.5" />
+            <input type="datetime-local" value={evTime} onChange={(e) => setEvTime(e.target.value)} className="border rounded px-2 py-1.5" />
+            <input type="number" min={0} value={evSeq} onChange={(e) => setEvSeq(e.target.value)} className="border rounded px-2 py-1.5" placeholder="Seq" />
+            <button className="bg-orange-600 text-white px-3 rounded text-sm">Add</button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input type="number" step="any" placeholder="Latitude (optional, -90 to 90)" value={evLat} onChange={(e) => setEvLat(e.target.value)} className="border rounded px-2 py-1.5" />
+            <input type="number" step="any" placeholder="Longitude (optional, -180 to 180)" value={evLng} onChange={(e) => setEvLng(e.target.value)} className="border rounded px-2 py-1.5" />
+          </div>
+          <p className="text-xs text-slate-500">Tip: tap a place on Google Maps → right-click → copy coordinates. Latest event with coordinates shows as the live location on the customer map.</p>
         </form>
       </div>
     </div>
