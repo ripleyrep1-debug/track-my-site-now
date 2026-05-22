@@ -9,25 +9,41 @@
 <link href="assets/css/style.css" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
+  body { color: #1a2238; }
   .track-hero { background: linear-gradient(135deg,#0d2c54,#163a6e); color: #fff; padding: 110px 0 50px; }
-  .track-form .form-control { height: 56px; }
+  .track-hero .lead { color: #fff; opacity: 1; font-weight: 400; }
+  .track-form .form-control { height: 56px; font-size: 16px; color: #1a2238; }
+  .track-form .form-control::placeholder { color: #6b7280; }
+  .text-muted { color: #5a6478 !important; }
+  .label-eyebrow { color: #6b7280; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; }
+  .field-value { color: #0d2c54; font-weight: 600; font-size: 15px; }
+  .tracking-id { color: #0d2c54; font-weight: 800; letter-spacing: .02em; }
+  .recipient { color: #374151; font-size: 14px; font-weight: 500; }
   .timeline { position: relative; padding-left: 32px; }
   .timeline:before { content: ''; position: absolute; left: 11px; top: 8px; bottom: 8px; width: 2px; background: #e3e6ef; }
   .timeline .item { position: relative; padding-bottom: 22px; }
   .timeline .item:before { content: ''; position: absolute; left: -28px; top: 4px; width: 16px; height: 16px; border-radius: 50%; background: #e3e6ef; border: 3px solid #fff; box-shadow: 0 0 0 1px #e3e6ef; }
   .timeline .item.done:before { background: #ff6b00; box-shadow: 0 0 0 1px #ff6b00; }
   .timeline .item.current:before { background: #ff6b00; animation: pulse 1.5s infinite; }
+  .timeline .item .tl-label { color: #0d2c54; font-weight: 700; font-size: 15px; }
+  .timeline .item .tl-loc { color: #4b5563; font-size: 13px; font-weight: 500; }
+  .timeline .item .tl-time { color: #4b5563; font-size: 13px; font-weight: 500; white-space: nowrap; }
   @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(255,107,0,.5)} 70%{box-shadow:0 0 0 12px rgba(255,107,0,0)} 100%{box-shadow:0 0 0 0 rgba(255,107,0,0)} }
-  .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; font-weight: 600; font-size: 14px; }
+  .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; }
   .status-pill .dot { width: 8px; height: 8px; border-radius: 50%; }
   .status-default { background:#fff3e8; color:#c75300; } .status-default .dot { background:#ff6b00; }
   .status-delivered { background:#e6f7ec; color:#1b7a3e; } .status-delivered .dot { background:#1b7a3e; }
   .status-hold { background:#fff8d9; color:#8a6d00; } .status-hold .dot { background:#e0b500; }
   .status-issue { background:#fde7e7; color:#a31b1b; } .status-issue .dot { background:#d32f2f; }
-  #map { height: 380px; border-radius: 10px; }
-  .live-indicator { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#1b7a3e; font-weight:600; }
+  #map { height: 420px; border-radius: 10px; background:#eef1f6; }
+  .live-indicator { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#1b7a3e; font-weight:700; }
   .live-indicator .live-dot { width:8px; height:8px; border-radius:50%; background:#1b7a3e; animation:pulse 1.5s infinite; }
-  .leaflet-popup-content { margin: 8px 12px; }
+  .leaflet-popup-content { margin: 8px 12px; color:#1a2238; }
+  .progress-track { height: 8px; background: #eef1f6; border-radius: 999px; overflow: hidden; margin: 16px 0 6px; }
+  .progress-track .bar { height: 100%; background: linear-gradient(90deg,#ff6b00,#ff9248); border-radius: 999px; transition: width .6s ease; }
+  .progress-meta { display:flex; justify-content: space-between; font-size: 12px; color:#5a6478; font-weight: 600; }
+  .summary-card { border:1px solid #eef1f6; }
+  .timeline-card h5 { color: #0d2c54; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -121,12 +137,25 @@
     var rows = stages.map(function (s, i) {
       var current = i === lastIdx;
       return '<div class="item done ' + (current ? 'current' : '') + '">' +
-        '<div class="d-flex justify-content-between flex-wrap">' +
-          '<div><div class="fw-semibold text-dark">' + esc(s.label) + '</div>' +
-          '<div class="small text-muted">' + esc(s.location || '') + '</div></div>' +
-          '<div class="small text-muted">' + esc(fmt(s.event_time)) + '</div>' +
+        '<div class="d-flex justify-content-between flex-wrap gap-2">' +
+          '<div><div class="tl-label">' + esc(s.label) + '</div>' +
+          '<div class="tl-loc">' + esc(s.location || '') + '</div></div>' +
+          '<div class="tl-time">' + esc(fmt(s.event_time)) + '</div>' +
         '</div></div>';
     }).join('');
+
+    // Progress percentage based on status keywords
+    var statusLower = (d.shipment.status || '').toLowerCase();
+    var pct = 10;
+    if (statusLower.indexOf('order') === 0) pct = 10;
+    else if (statusLower.indexOf('picked') !== -1) pct = 20;
+    else if (statusLower.indexOf('warehouse') !== -1) pct = 30;
+    else if (statusLower.indexOf('transit') !== -1) pct = 55;
+    else if (statusLower.indexOf('port') !== -1) pct = 65;
+    else if (statusLower.indexOf('customs') !== -1) pct = 75;
+    else if (statusLower.indexOf('out for') !== -1) pct = 90;
+    else if (statusLower.indexOf('deliver') === 0) pct = 100;
+    else if (statusLower.indexOf('hold') !== -1) pct = 50;
 
     // signature to avoid re-rendering map on identical polls
     var sig = JSON.stringify({ s: d.shipment.status, e: stages.map(function(x){return [x.label,x.event_time,x.latitude,x.longitude];}) });
@@ -134,35 +163,37 @@
     lastSig = sig;
 
     document.getElementById('result').innerHTML =
-      '<div class="bg-white shadow-sm rounded p-4 p-md-5 mb-4">' +
+      '<div class="bg-white shadow-sm rounded summary-card p-4 p-md-5 mb-4">' +
         '<div class="d-flex justify-content-between flex-wrap gap-3 align-items-start">' +
           '<div>' +
-            '<div class="text-uppercase small text-muted fw-bold">Tracking ID</div>' +
-            '<div class="h3 fw-bold mb-0">' + esc(d.shipment.tracking_number) + '</div>' +
-            (d.shipment.customer_name ? '<div class="small text-muted mt-1">Recipient: ' + esc(d.shipment.customer_name) + '</div>' : '') +
+            '<div class="label-eyebrow">Tracking ID</div>' +
+            '<div class="h3 tracking-id mb-1">' + esc(d.shipment.tracking_number) + '</div>' +
+            (d.shipment.customer_name ? '<div class="recipient"><i class="bi bi-person-circle"></i> Recipient: <strong>' + esc(d.shipment.customer_name) + '</strong></div>' : '') +
           '</div>' +
           '<div class="text-end">' +
             '<span class="status-pill ' + statusClass(d.shipment.status) + '"><span class="dot"></span>' + esc(d.shipment.status) + '</span>' +
             '<div class="live-indicator mt-2"><span class="live-dot"></span>Live · updates every 20s</div>' +
           '</div>' +
         '</div>' +
-        '<hr/>' +
+        '<div class="progress-track"><div class="bar" style="width:' + pct + '%"></div></div>' +
+        '<div class="progress-meta"><span>' + esc(d.shipment.origin) + '</span><span>' + pct + '% complete</span><span>' + esc(d.shipment.destination) + '</span></div>' +
+        '<hr class="mt-4"/>' +
         '<div class="row g-4">' +
-          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Origin</div><div class="fw-semibold">' + esc(d.shipment.origin) + '</div></div>' +
-          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Destination</div><div class="fw-semibold">' + esc(d.shipment.destination) + '</div></div>' +
-          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">ETA</div><div class="fw-semibold">' + esc(d.shipment.eta ? fmt(d.shipment.eta) : '—') + '</div></div>' +
-          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Carrier</div><div class="fw-semibold">' + esc(d.shipment.carrier) + '</div></div>' +
-          (d.shipment.service ? '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Service</div><div class="fw-semibold">' + esc(d.shipment.service) + '</div></div>' : '') +
-          (d.shipment.weight ? '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Weight</div><div class="fw-semibold">' + esc(d.shipment.weight) + '</div></div>' : '') +
+          '<div class="col-6 col-md-3"><div class="label-eyebrow">Origin</div><div class="field-value">' + esc(d.shipment.origin) + '</div></div>' +
+          '<div class="col-6 col-md-3"><div class="label-eyebrow">Destination</div><div class="field-value">' + esc(d.shipment.destination) + '</div></div>' +
+          '<div class="col-6 col-md-3"><div class="label-eyebrow">Estimated arrival</div><div class="field-value">' + esc(d.shipment.eta ? fmt(d.shipment.eta) : '—') + '</div></div>' +
+          '<div class="col-6 col-md-3"><div class="label-eyebrow">Carrier</div><div class="field-value">' + esc(d.shipment.carrier) + '</div></div>' +
+          (d.shipment.service ? '<div class="col-6 col-md-3"><div class="label-eyebrow">Service</div><div class="field-value">' + esc(d.shipment.service) + '</div></div>' : '') +
+          (d.shipment.weight ? '<div class="col-6 col-md-3"><div class="label-eyebrow">Weight</div><div class="field-value">' + esc(d.shipment.weight) + '</div></div>' : '') +
         '</div>' +
       '</div>' +
 
       '<div class="row g-4">' +
         '<div class="col-lg-7">' +
-          '<div class="bg-white shadow-sm rounded p-3"><div id="map"></div></div>' +
+          '<div class="bg-white shadow-sm rounded p-3 summary-card"><div id="map"></div></div>' +
         '</div>' +
         '<div class="col-lg-5">' +
-          '<div class="bg-white shadow-sm rounded p-4 h-100">' +
+          '<div class="bg-white shadow-sm rounded summary-card timeline-card p-4 h-100">' +
             '<h5 class="fw-bold mb-3">Shipment timeline</h5>' +
             (stages.length ? '<div class="timeline">' + rows + '</div>' : '<p class="text-muted small mb-0">No events logged yet. Check back soon.</p>') +
           '</div>' +
