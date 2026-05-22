@@ -8,7 +8,6 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const nav = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -25,17 +24,8 @@ function AuthPage() {
     setError(null);
     setLoading(true);
     try {
-      if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: `${window.location.origin}/admin` },
-        });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
       nav({ to: "/admin" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -48,7 +38,7 @@ function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-md bg-white rounded-lg shadow p-8">
         <Link to="/" className="text-sm text-slate-500 hover:underline">← Back to site</Link>
-        <h1 className="text-2xl font-bold mt-3 mb-1">Admin {mode === "signup" ? "sign up" : "sign in"}</h1>
+        <h1 className="text-2xl font-bold mt-3 mb-1">Admin sign in</h1>
         <p className="text-sm text-slate-500 mb-6">Logiport shipment management</p>
         <form onSubmit={submit} className="space-y-3">
           <input
@@ -57,19 +47,16 @@ function AuthPage() {
           />
           <input
             type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password (min 6)" className="w-full border rounded px-3 py-2"
+            placeholder="Password" className="w-full border rounded px-3 py-2"
           />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button disabled={loading} className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2 rounded font-medium">
-            {loading ? "Please wait…" : mode === "signup" ? "Create account" : "Sign in"}
+            {loading ? "Please wait…" : "Sign in"}
           </button>
         </form>
-        <button
-          onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
-          className="mt-4 text-sm text-slate-600 hover:underline"
-        >
-          {mode === "signup" ? "Have an account? Sign in" : "Need an account? Sign up"}
-        </button>
+        <p className="mt-4 text-xs text-slate-500">
+          Admin accounts are provisioned by invitation only. Contact the system owner if you need access.
+        </p>
       </div>
     </div>
   );
