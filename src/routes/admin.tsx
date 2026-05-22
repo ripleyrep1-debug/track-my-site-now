@@ -232,7 +232,11 @@ function ShipmentDetail({ id, getOneFn, updateFn, deleteFn, addEvFn, delEvFn, on
   const [evLoc, setEvLoc] = useState("");
   const [evTime, setEvTime] = useState("");
   const [evSeq, setEvSeq] = useState("0");
+  const [evLat, setEvLat] = useState("");
+  const [evLng, setEvLng] = useState("");
   const [status, setStatus] = useState<string>("");
+
+  const STATUS_OPTIONS = ["Order received","Picked up","Left the warehouse","In transit","Arrived at port","Customs clearance","Out for delivery","On hold","Delivered","Failed delivery","Returned"];
 
   useEffect(() => { if (q.data?.shipment?.status) setStatus(q.data.shipment.status); }, [q.data]);
 
