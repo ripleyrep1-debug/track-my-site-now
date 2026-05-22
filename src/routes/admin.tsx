@@ -166,7 +166,7 @@ function AdminPage() {
             <Field label="Destination" required value={form.destination} onChange={(v) => setForm({ ...form, destination: v })} placeholder="Rotterdam, NL" />
             <Field label="Carrier" value={form.carrier} onChange={(v) => setForm({ ...form, carrier: v })} />
             <SelectField label="Status" value={form.status} onChange={(v) => setForm({ ...form, status: v })}
-              options={["Order received","Picked up","In transit","Arrived at port","Out for delivery","Delivered"]} />
+              options={["Order received","Picked up","Left the warehouse","In transit","Arrived at port","Customs clearance","Out for delivery","On hold","Delivered","Failed delivery","Returned"]} />
             <Field label="ETA" type="datetime-local" value={form.eta} onChange={(v) => setForm({ ...form, eta: v })} />
             <Field label="Service" value={form.service} onChange={(v) => setForm({ ...form, service: v })} placeholder="Ocean freight" />
             <Field label="Weight" value={form.weight} onChange={(v) => setForm({ ...form, weight: v })} placeholder="12 kg" />
