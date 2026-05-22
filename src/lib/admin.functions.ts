@@ -155,6 +155,8 @@ const EventInput = z.object({
   location: z.string().max(200).optional().nullable(),
   event_time: z.string().optional().nullable().or(z.literal("")),
   sequence: z.number().int().min(0).max(9999).default(0),
+  latitude: z.number().min(-90).max(90).optional().nullable(),
+  longitude: z.number().min(-180).max(180).optional().nullable(),
 });
 
 export const addEvent = createServerFn({ method: "POST" })
