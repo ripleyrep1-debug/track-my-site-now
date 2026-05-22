@@ -19,7 +19,7 @@ export const Route = createFileRoute("/api/public/track")({
         }
         const { data: shipment, error } = await supabaseAdmin
           .from("shipments")
-          .select("tracking_number, customer_name, origin, destination, carrier, status, eta, service, weight")
+          .select("id, tracking_number, customer_name, origin, destination, carrier, status, eta, service, weight")
           .eq("tracking_number", id)
           .maybeSingle();
         if (error) {
@@ -31,23 +31,12 @@ export const Route = createFileRoute("/api/public/track")({
         const { data: events } = await supabaseAdmin
           .from("shipment_events")
           .select("label, location, event_time, sequence")
-          .eq("tracking_number" as never, id as never) // ignored
-          .limit(0);
-        // Fetch events by shipment_id
-        const { data: shipFull } = await supabaseAdmin
-          .from("shipments")
-          .select("id")
-          .eq("tracking_number", id)
-          .single();
-        const { data: evs } = await supabaseAdmin
-          .from("shipment_events")
-          .select("label, location, event_time, sequence")
-          .eq("shipment_id", shipFull!.id)
+          .eq("shipment_id", shipment.id)
           .order("sequence", { ascending: true })
           .order("event_time", { ascending: true });
-        void events;
+        const { id: _drop, ...publicShipment } = shipment;
         return Response.json(
-          { found: true, shipment, events: evs ?? [] },
+          { found: true, shipment: publicShipment, events: events ?? [] },
           { headers: cors },
         );
       },
