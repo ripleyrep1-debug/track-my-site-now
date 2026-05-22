@@ -20,7 +20,9 @@ export type Database = {
           event_time: string
           id: string
           label: string
+          latitude: number | null
           location: string | null
+          longitude: number | null
           sequence: number
           shipment_id: string
         }
@@ -29,7 +31,9 @@ export type Database = {
           event_time?: string
           id?: string
           label: string
+          latitude?: number | null
           location?: string | null
+          longitude?: number | null
           sequence?: number
           shipment_id: string
         }
@@ -38,7 +42,9 @@ export type Database = {
           event_time?: string
           id?: string
           label?: string
+          latitude?: number | null
           location?: string | null
+          longitude?: number | null
           sequence?: number
           shipment_id?: string
         }

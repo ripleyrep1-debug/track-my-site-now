@@ -7,18 +7,27 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <link href="assets/css/bootstrap.min.css" rel="stylesheet">
 <link href="assets/css/style.css" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
-  .track-hero { background: #0d2c54; color: #fff; padding: 120px 0 60px; }
+  .track-hero { background: linear-gradient(135deg,#0d2c54,#163a6e); color: #fff; padding: 110px 0 50px; }
   .track-form .form-control { height: 56px; }
   .timeline { position: relative; padding-left: 32px; }
   .timeline:before { content: ''; position: absolute; left: 11px; top: 8px; bottom: 8px; width: 2px; background: #e3e6ef; }
-  .timeline .item { position: relative; padding-bottom: 28px; }
+  .timeline .item { position: relative; padding-bottom: 22px; }
   .timeline .item:before { content: ''; position: absolute; left: -28px; top: 4px; width: 16px; height: 16px; border-radius: 50%; background: #e3e6ef; border: 3px solid #fff; box-shadow: 0 0 0 1px #e3e6ef; }
   .timeline .item.done:before { background: #ff6b00; box-shadow: 0 0 0 1px #ff6b00; }
   .timeline .item.current:before { background: #ff6b00; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(255,107,0,.5)} 70%{box-shadow:0 0 0 12px rgba(255,107,0,0)} 100%{box-shadow:0 0 0 0 rgba(255,107,0,0)} }
-  .status-pill { display: inline-flex; align-items: center; gap: 8px; background: #fff3e8; color: #c75300; padding: 6px 14px; border-radius: 999px; font-weight: 600; font-size: 14px; }
-  .status-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #ff6b00; }
+  .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; font-weight: 600; font-size: 14px; }
+  .status-pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .status-default { background:#fff3e8; color:#c75300; } .status-default .dot { background:#ff6b00; }
+  .status-delivered { background:#e6f7ec; color:#1b7a3e; } .status-delivered .dot { background:#1b7a3e; }
+  .status-hold { background:#fff8d9; color:#8a6d00; } .status-hold .dot { background:#e0b500; }
+  .status-issue { background:#fde7e7; color:#a31b1b; } .status-issue .dot { background:#d32f2f; }
+  #map { height: 380px; border-radius: 10px; }
+  .live-indicator { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#1b7a3e; font-weight:600; }
+  .live-indicator .live-dot { width:8px; height:8px; border-radius:50%; background:#1b7a3e; animation:pulse 1.5s infinite; }
+  .leaflet-popup-content { margin: 8px 12px; }
 </style>
 </head>
 <body>
@@ -27,7 +36,7 @@
   <div class="container">
     <a href="index.html" class="text-white text-decoration-none small"><i class="bi bi-arrow-left"></i> Back to home</a>
     <h1 class="display-5 fw-bold mt-3">Track your shipment</h1>
-    <p class="lead opacity-75 mb-4">Enter the tracking number from your shipping confirmation.</p>
+    <p class="lead opacity-75 mb-4">Live tracking — see exactly where your package is, right now.</p>
     <form id="trackForm" class="row g-2 track-form bg-white p-2 rounded shadow-sm" style="max-width: 720px;">
       <div class="col-md-8">
         <input id="trackInput" type="text" required class="form-control border-0" placeholder="Enter tracking number" />
@@ -50,19 +59,68 @@
 
 <script src="assets/js/jquery.min.js"></script>
 <script src="assets/js/bootstrap.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 (function () {
+  var pollTimer = null;
+  var map = null;
+  var mapLayer = null;
+  var lastSig = '';
+
   function getParam(n) { return new URLSearchParams(window.location.search).get(n); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); }
   function fmt(t) { if (!t) return ''; try { return new Date(t).toLocaleString(); } catch(e) { return t; } }
+
+  function statusClass(s) {
+    s = (s || '').toLowerCase();
+    if (s.indexOf('deliver') === 0) return 'status-delivered';
+    if (s.indexOf('hold') !== -1) return 'status-hold';
+    if (s.indexOf('fail') !== -1 || s.indexOf('return') !== -1) return 'status-issue';
+    return 'status-default';
+  }
+
+  function renderMap(events, shipment) {
+    var withCoords = events.filter(function (e) { return e.latitude != null && e.longitude != null; });
+    var mapHost = document.getElementById('map');
+    if (!mapHost) return;
+    if (!withCoords.length) {
+      mapHost.innerHTML = '<div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted bg-light rounded"><i class="bi bi-geo-alt" style="font-size:36px"></i><p class="mt-2 mb-0 small">Location updates will appear here as your package moves.</p></div>';
+      return;
+    }
+    if (!map) {
+      map = L.map('map', { scrollWheelZoom: false }).setView([withCoords[0].latitude, withCoords[0].longitude], 4);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+    }
+    if (mapLayer) { map.removeLayer(mapLayer); }
+    mapLayer = L.layerGroup().addTo(map);
+
+    var latlngs = withCoords.map(function (e) { return [e.latitude, e.longitude]; });
+    L.polyline(latlngs, { color: '#ff6b00', weight: 3, opacity: 0.7, dashArray: '6,8' }).addTo(mapLayer);
+
+    withCoords.forEach(function (e, i) {
+      var isLast = i === withCoords.length - 1;
+      var icon = L.divIcon({
+        className: '',
+        html: '<div style="width:' + (isLast?22:14) + 'px;height:' + (isLast?22:14) + 'px;border-radius:50%;background:' + (isLast?'#ff6b00':'#0d2c54') + ';border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)' + (isLast?';animation:pulse 1.5s infinite':'') + '"></div>',
+        iconSize: [isLast?22:14, isLast?22:14],
+        iconAnchor: [isLast?11:7, isLast?11:7]
+      });
+      L.marker([e.latitude, e.longitude], { icon: icon }).addTo(mapLayer)
+        .bindPopup('<strong>' + esc(e.label) + '</strong><br>' + esc(e.location || '') + '<br><small>' + esc(fmt(e.event_time)) + '</small>');
+    });
+
+    if (latlngs.length === 1) { map.setView(latlngs[0], 6); }
+    else { map.fitBounds(L.latLngBounds(latlngs).pad(0.25)); }
+  }
 
   function render(d) {
     var stages = (d.events || []).slice().sort(function(a,b){ return (a.sequence||0)-(b.sequence||0) || new Date(a.event_time)-new Date(b.event_time); });
     var lastIdx = stages.length - 1;
     var rows = stages.map(function (s, i) {
-      var done = i <= lastIdx;
       var current = i === lastIdx;
-      return '<div class="item ' + (done ? 'done ' : '') + (current ? 'current' : '') + '">' +
+      return '<div class="item done ' + (current ? 'current' : '') + '">' +
         '<div class="d-flex justify-content-between flex-wrap">' +
           '<div><div class="fw-semibold text-dark">' + esc(s.label) + '</div>' +
           '<div class="small text-muted">' + esc(s.location || '') + '</div></div>' +
@@ -70,12 +128,23 @@
         '</div></div>';
     }).join('');
 
+    // signature to avoid re-rendering map on identical polls
+    var sig = JSON.stringify({ s: d.shipment.status, e: stages.map(function(x){return [x.label,x.event_time,x.latitude,x.longitude];}) });
+    var changed = sig !== lastSig;
+    lastSig = sig;
+
     document.getElementById('result').innerHTML =
       '<div class="bg-white shadow-sm rounded p-4 p-md-5 mb-4">' +
         '<div class="d-flex justify-content-between flex-wrap gap-3 align-items-start">' +
-          '<div><div class="text-uppercase small text-muted fw-bold">Tracking ID</div>' +
-          '<div class="h3 fw-bold mb-0">' + esc(d.shipment.tracking_number) + '</div></div>' +
-          '<span class="status-pill"><span class="dot"></span>' + esc(d.shipment.status) + '</span>' +
+          '<div>' +
+            '<div class="text-uppercase small text-muted fw-bold">Tracking ID</div>' +
+            '<div class="h3 fw-bold mb-0">' + esc(d.shipment.tracking_number) + '</div>' +
+            (d.shipment.customer_name ? '<div class="small text-muted mt-1">Recipient: ' + esc(d.shipment.customer_name) + '</div>' : '') +
+          '</div>' +
+          '<div class="text-end">' +
+            '<span class="status-pill ' + statusClass(d.shipment.status) + '"><span class="dot"></span>' + esc(d.shipment.status) + '</span>' +
+            '<div class="live-indicator mt-2"><span class="live-dot"></span>Live · updates every 20s</div>' +
+          '</div>' +
         '</div>' +
         '<hr/>' +
         '<div class="row g-4">' +
@@ -83,15 +152,26 @@
           '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Destination</div><div class="fw-semibold">' + esc(d.shipment.destination) + '</div></div>' +
           '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">ETA</div><div class="fw-semibold">' + esc(d.shipment.eta ? fmt(d.shipment.eta) : '—') + '</div></div>' +
           '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Carrier</div><div class="fw-semibold">' + esc(d.shipment.carrier) + '</div></div>' +
+          (d.shipment.service ? '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Service</div><div class="fw-semibold">' + esc(d.shipment.service) + '</div></div>' : '') +
+          (d.shipment.weight ? '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Weight</div><div class="fw-semibold">' + esc(d.shipment.weight) + '</div></div>' : '') +
         '</div>' +
       '</div>' +
-      (stages.length ?
-        '<div class="bg-white shadow-sm rounded p-4 p-md-5">' +
-          '<h4 class="fw-bold mb-4">Shipment timeline</h4>' +
-          '<div class="timeline">' + rows + '</div>' +
-        '</div>'
-        : '<div class="alert alert-light border">No timeline events have been logged yet.</div>'
-      );
+
+      '<div class="row g-4">' +
+        '<div class="col-lg-7">' +
+          '<div class="bg-white shadow-sm rounded p-3"><div id="map"></div></div>' +
+        '</div>' +
+        '<div class="col-lg-5">' +
+          '<div class="bg-white shadow-sm rounded p-4 h-100">' +
+            '<h5 class="fw-bold mb-3">Shipment timeline</h5>' +
+            (stages.length ? '<div class="timeline">' + rows + '</div>' : '<p class="text-muted small mb-0">No events logged yet. Check back soon.</p>') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    // map needs DOM mount, then init/refresh
+    if (changed) { map = null; mapLayer = null; }
+    setTimeout(function(){ renderMap(stages, d.shipment); }, 0);
   }
 
   function setStatus(html) {
@@ -100,15 +180,19 @@
     el.innerHTML = html; el.style.display = 'block';
   }
 
-  function lookup(id) {
-    document.getElementById('result').innerHTML = '';
-    document.getElementById('empty').style.display = 'none';
-    setStatus('<div class="text-muted small"><i class="bi bi-hourglass-split"></i> Looking up ' + esc(id) + '…</div>');
+  function lookup(id, silent) {
+    if (!silent) {
+      document.getElementById('empty').style.display = 'none';
+      if (!document.getElementById('result').innerHTML) {
+        setStatus('<div class="text-muted small"><i class="bi bi-hourglass-split"></i> Looking up ' + esc(id) + '…</div>');
+      }
+    }
     fetch('/api/public/track?id=' + encodeURIComponent(id))
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
       .then(function (res) {
         setStatus('');
         if (res.status === 404 || res.body.found === false) {
+          stopPoll();
           document.getElementById('result').innerHTML =
             '<div class="bg-white shadow-sm rounded p-5 text-center">' +
               '<i class="bi bi-exclamation-circle" style="font-size:48px;color:#ff6b00"></i>' +
@@ -118,23 +202,32 @@
           return;
         }
         if (!res.ok) {
-          setStatus('<div class="text-danger">' + esc(res.body.error || 'Lookup failed') + '</div>');
+          if (!silent) setStatus('<div class="text-danger">' + esc(res.body.error || 'Lookup failed') + '</div>');
           return;
         }
         render(res.body);
       })
-      .catch(function () { setStatus('<div class="text-danger">Network error. Please try again.</div>'); });
+      .catch(function () { if (!silent) setStatus('<div class="text-danger">Network error. Please try again.</div>'); });
   }
 
+  function startPoll(id) {
+    stopPoll();
+    pollTimer = setInterval(function(){ lookup(id, true); }, 20000);
+  }
+  function stopPoll() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
   var id = getParam('id');
-  if (id) { document.getElementById('trackInput').value = id; lookup(id); }
+  if (id) { document.getElementById('trackInput').value = id; lookup(id); startPoll(id); }
   else { document.getElementById('empty').style.display = 'block'; }
+
   document.getElementById('trackForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var v = document.getElementById('trackInput').value.trim();
     if (!v) return;
     history.replaceState(null, '', 'track.html?id=' + encodeURIComponent(v));
-    lookup(v);
+    lastSig = ''; map = null; mapLayer = null;
+    document.getElementById('result').innerHTML = '';
+    lookup(v); startPoll(v);
   });
 })();
 </script>

@@ -30,7 +30,7 @@ export const Route = createFileRoute("/api/public/track")({
         }
         const { data: events } = await supabaseAdmin
           .from("shipment_events")
-          .select("label, location, event_time, sequence")
+          .select("label, location, event_time, sequence, latitude, longitude")
           .eq("shipment_id", shipment.id)
           .order("sequence", { ascending: true })
           .order("event_time", { ascending: true });
