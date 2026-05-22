@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS one_admin_only ON public.user_roles ((role)) WHERE role = 'admin';
