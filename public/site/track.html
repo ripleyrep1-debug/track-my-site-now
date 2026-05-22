@@ -137,12 +137,25 @@
     var rows = stages.map(function (s, i) {
       var current = i === lastIdx;
       return '<div class="item done ' + (current ? 'current' : '') + '">' +
-        '<div class="d-flex justify-content-between flex-wrap">' +
-          '<div><div class="fw-semibold text-dark">' + esc(s.label) + '</div>' +
-          '<div class="small text-muted">' + esc(s.location || '') + '</div></div>' +
-          '<div class="small text-muted">' + esc(fmt(s.event_time)) + '</div>' +
+        '<div class="d-flex justify-content-between flex-wrap gap-2">' +
+          '<div><div class="tl-label">' + esc(s.label) + '</div>' +
+          '<div class="tl-loc">' + esc(s.location || '') + '</div></div>' +
+          '<div class="tl-time">' + esc(fmt(s.event_time)) + '</div>' +
         '</div></div>';
     }).join('');
+
+    // Progress percentage based on status keywords
+    var statusLower = (d.shipment.status || '').toLowerCase();
+    var pct = 10;
+    if (statusLower.indexOf('order') === 0) pct = 10;
+    else if (statusLower.indexOf('picked') !== -1) pct = 20;
+    else if (statusLower.indexOf('warehouse') !== -1) pct = 30;
+    else if (statusLower.indexOf('transit') !== -1) pct = 55;
+    else if (statusLower.indexOf('port') !== -1) pct = 65;
+    else if (statusLower.indexOf('customs') !== -1) pct = 75;
+    else if (statusLower.indexOf('out for') !== -1) pct = 90;
+    else if (statusLower.indexOf('deliver') === 0) pct = 100;
+    else if (statusLower.indexOf('hold') !== -1) pct = 50;
 
     // signature to avoid re-rendering map on identical polls
     var sig = JSON.stringify({ s: d.shipment.status, e: stages.map(function(x){return [x.label,x.event_time,x.latitude,x.longitude];}) });
@@ -150,35 +163,37 @@
     lastSig = sig;
 
     document.getElementById('result').innerHTML =
-      '<div class="bg-white shadow-sm rounded p-4 p-md-5 mb-4">' +
+      '<div class="bg-white shadow-sm rounded summary-card p-4 p-md-5 mb-4">' +
         '<div class="d-flex justify-content-between flex-wrap gap-3 align-items-start">' +
           '<div>' +
-            '<div class="text-uppercase small text-muted fw-bold">Tracking ID</div>' +
-            '<div class="h3 fw-bold mb-0">' + esc(d.shipment.tracking_number) + '</div>' +
-            (d.shipment.customer_name ? '<div class="small text-muted mt-1">Recipient: ' + esc(d.shipment.customer_name) + '</div>' : '') +
+            '<div class="label-eyebrow">Tracking ID</div>' +
+            '<div class="h3 tracking-id mb-1">' + esc(d.shipment.tracking_number) + '</div>' +
+            (d.shipment.customer_name ? '<div class="recipient"><i class="bi bi-person-circle"></i> Recipient: <strong>' + esc(d.shipment.customer_name) + '</strong></div>' : '') +
           '</div>' +
           '<div class="text-end">' +
             '<span class="status-pill ' + statusClass(d.shipment.status) + '"><span class="dot"></span>' + esc(d.shipment.status) + '</span>' +
             '<div class="live-indicator mt-2"><span class="live-dot"></span>Live · updates every 20s</div>' +
           '</div>' +
         '</div>' +
-        '<hr/>' +
+        '<div class="progress-track"><div class="bar" style="width:' + pct + '%"></div></div>' +
+        '<div class="progress-meta"><span>' + esc(d.shipment.origin) + '</span><span>' + pct + '% complete</span><span>' + esc(d.shipment.destination) + '</span></div>' +
+        '<hr class="mt-4"/>' +
         '<div class="row g-4">' +
-          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Origin</div><div class="fw-semibold">' + esc(d.shipment.origin) + '</div></div>' +
-          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Destination</div><div class="fw-semibold">' + esc(d.shipment.destination) + '</div></div>' +
-          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">ETA</div><div class="fw-semibold">' + esc(d.shipment.eta ? fmt(d.shipment.eta) : '—') + '</div></div>' +
-          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Carrier</div><div class="fw-semibold">' + esc(d.shipment.carrier) + '</div></div>' +
-          (d.shipment.service ? '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Service</div><div class="fw-semibold">' + esc(d.shipment.service) + '</div></div>' : '') +
-          (d.shipment.weight ? '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Weight</div><div class="fw-semibold">' + esc(d.shipment.weight) + '</div></div>' : '') +
+          '<div class="col-6 col-md-3"><div class="label-eyebrow">Origin</div><div class="field-value">' + esc(d.shipment.origin) + '</div></div>' +
+          '<div class="col-6 col-md-3"><div class="label-eyebrow">Destination</div><div class="field-value">' + esc(d.shipment.destination) + '</div></div>' +
+          '<div class="col-6 col-md-3"><div class="label-eyebrow">Estimated arrival</div><div class="field-value">' + esc(d.shipment.eta ? fmt(d.shipment.eta) : '—') + '</div></div>' +
+          '<div class="col-6 col-md-3"><div class="label-eyebrow">Carrier</div><div class="field-value">' + esc(d.shipment.carrier) + '</div></div>' +
+          (d.shipment.service ? '<div class="col-6 col-md-3"><div class="label-eyebrow">Service</div><div class="field-value">' + esc(d.shipment.service) + '</div></div>' : '') +
+          (d.shipment.weight ? '<div class="col-6 col-md-3"><div class="label-eyebrow">Weight</div><div class="field-value">' + esc(d.shipment.weight) + '</div></div>' : '') +
         '</div>' +
       '</div>' +
 
       '<div class="row g-4">' +
         '<div class="col-lg-7">' +
-          '<div class="bg-white shadow-sm rounded p-3"><div id="map"></div></div>' +
+          '<div class="bg-white shadow-sm rounded p-3 summary-card"><div id="map"></div></div>' +
         '</div>' +
         '<div class="col-lg-5">' +
-          '<div class="bg-white shadow-sm rounded p-4 h-100">' +
+          '<div class="bg-white shadow-sm rounded summary-card timeline-card p-4 h-100">' +
             '<h5 class="fw-bold mb-3">Shipment timeline</h5>' +
             (stages.length ? '<div class="timeline">' + rows + '</div>' : '<p class="text-muted small mb-0">No events logged yet. Check back soon.</p>') +
           '</div>' +
