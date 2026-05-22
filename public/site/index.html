@@ -188,6 +188,46 @@
         </div>
         <!-- Carousel End -->
 
+        <!-- Tracking Widget Start -->
+        <div class="container-fluid py-5" style="background: #f4f6fb;">
+            <div class="container">
+                <div class="row justify-content-center">
+                    <div class="col-lg-9">
+                        <div class="bg-white p-4 p-md-5 shadow-sm rounded">
+                            <div class="text-center mb-4">
+                                <h4 class="text-primary mb-1">Track Your Shipment</h4>
+                                <p class="mb-0 text-muted">Enter your tracking number to see live status and ETA.</p>
+                            </div>
+                            <form id="trackForm" class="row g-3 align-items-stretch">
+                                <div class="col-md-8">
+                                    <input id="trackInput" type="text" required class="form-control form-control-lg" placeholder="e.g. LGP-2026-00482" />
+                                </div>
+                                <div class="col-md-4">
+                                    <button type="submit" class="btn btn-primary btn-lg w-100">Track Now</button>
+                                </div>
+                            </form>
+                            <small class="text-muted d-block mt-3">Try sample: <a href="track.html?id=LGP-2026-00482">LGP-2026-00482</a></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            (function () {
+                var f = document.getElementById('trackForm');
+                if (!f) return;
+                f.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    var v = document.getElementById('trackInput').value.trim();
+                    if (!v) return;
+                    window.location.href = 'track.html?id=' + encodeURIComponent(v);
+                });
+            })();
+        </script>
+        <!-- Tracking Widget End -->
+
+
+
 
         <!-- About Start -->
         <div class="container-fluid about py-5">
