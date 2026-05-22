@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Track Shipment - Logiport</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-<link href="assets/lib/animate/animate.min.css" rel="stylesheet">
-<link href="assets/lib/owlcarousel/assets/owl.carousel.min.css" rel="stylesheet">
 <link href="assets/css/bootstrap.min.css" rel="stylesheet">
 <link href="assets/css/style.css" rel="stylesheet">
 <style>
@@ -16,8 +14,8 @@
   .timeline:before { content: ''; position: absolute; left: 11px; top: 8px; bottom: 8px; width: 2px; background: #e3e6ef; }
   .timeline .item { position: relative; padding-bottom: 28px; }
   .timeline .item:before { content: ''; position: absolute; left: -28px; top: 4px; width: 16px; height: 16px; border-radius: 50%; background: #e3e6ef; border: 3px solid #fff; box-shadow: 0 0 0 1px #e3e6ef; }
-  .timeline .item.done:before { background: var(--bs-primary, #ff6b00); box-shadow: 0 0 0 1px var(--bs-primary, #ff6b00); }
-  .timeline .item.current:before { background: var(--bs-primary, #ff6b00); animation: pulse 1.5s infinite; }
+  .timeline .item.done:before { background: #ff6b00; box-shadow: 0 0 0 1px #ff6b00; }
+  .timeline .item.current:before { background: #ff6b00; animation: pulse 1.5s infinite; }
   @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(255,107,0,.5)} 70%{box-shadow:0 0 0 12px rgba(255,107,0,0)} 100%{box-shadow:0 0 0 0 rgba(255,107,0,0)} }
   .status-pill { display: inline-flex; align-items: center; gap: 8px; background: #fff3e8; color: #c75300; padding: 6px 14px; border-radius: 999px; font-weight: 600; font-size: 14px; }
   .status-pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #ff6b00; }
@@ -42,6 +40,7 @@
 </div>
 
 <div class="container py-5">
+  <div id="status" class="text-center py-3" style="display:none;"></div>
   <div id="result"></div>
   <div id="empty" class="text-center py-5 text-muted" style="display:none;">
     <i class="bi bi-box-seam" style="font-size: 48px;"></i>
@@ -53,77 +52,89 @@
 <script src="assets/js/bootstrap.min.js"></script>
 <script>
 (function () {
-  function getParam(n) {
-    return new URLSearchParams(window.location.search).get(n);
-  }
-  function hash(s) {
-    var h = 0;
-    for (var i = 0; i < s.length; i++) h = ((h * 31) + s.charCodeAt(i)) >>> 0;
-    return h;
-  }
-  function buildData(id) {
-    var h = hash(id);
-    var routes = [
-      ['Shanghai, CN', 'Rotterdam, NL'],
-      ['Los Angeles, US', 'Hamburg, DE'],
-      ['Singapore, SG', 'New York, US'],
-      ['Dubai, AE', 'Felixstowe, UK']
-    ];
-    var r = routes[h % routes.length];
-    var step = h % 5;
-    var stages = [
-      { label: 'Order received', loc: r[0], time: 'May 14, 09:12' },
-      { label: 'Picked up', loc: r[0], time: 'May 15, 14:30' },
-      { label: 'In transit', loc: 'Mid-Ocean', time: 'May 18, 22:05' },
-      { label: 'Arrived at port', loc: r[1], time: 'May 21, 06:48' },
-      { label: 'Out for delivery', loc: r[1], time: 'May 22, 08:15' },
-      { label: 'Delivered', loc: r[1], time: 'May 22, 17:40' }
-    ].map(function (s, i) {
-      return { label: s.label, loc: s.loc, time: s.time, done: i <= step, current: i === step };
-    });
-    return { id: id, origin: r[0], destination: r[1], eta: 'May 23, 18:00', carrier: 'Logiport Express', stages: stages };
-  }
-  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); }
-  function render(id) {
-    var d = buildData(id);
-    var current = d.stages.filter(function (s) { return s.current; })[0] || d.stages[d.stages.length - 1];
-    var rows = d.stages.map(function (s) {
-      return '<div class="item ' + (s.done ? 'done ' : '') + (s.current ? 'current' : '') + '">' +
+  function getParam(n) { return new URLSearchParams(window.location.search).get(n); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); }
+  function fmt(t) { if (!t) return ''; try { return new Date(t).toLocaleString(); } catch(e) { return t; } }
+
+  function render(d) {
+    var stages = (d.events || []).slice().sort(function(a,b){ return (a.sequence||0)-(b.sequence||0) || new Date(a.event_time)-new Date(b.event_time); });
+    var lastIdx = stages.length - 1;
+    var rows = stages.map(function (s, i) {
+      var done = i <= lastIdx;
+      var current = i === lastIdx;
+      return '<div class="item ' + (done ? 'done ' : '') + (current ? 'current' : '') + '">' +
         '<div class="d-flex justify-content-between flex-wrap">' +
-          '<div><div class="fw-semibold ' + (s.done ? 'text-dark' : 'text-muted') + '">' + esc(s.label) + '</div>' +
-          '<div class="small text-muted">' + esc(s.loc) + '</div></div>' +
-          '<div class="small text-muted">' + esc(s.time) + '</div>' +
+          '<div><div class="fw-semibold text-dark">' + esc(s.label) + '</div>' +
+          '<div class="small text-muted">' + esc(s.location || '') + '</div></div>' +
+          '<div class="small text-muted">' + esc(fmt(s.event_time)) + '</div>' +
         '</div></div>';
     }).join('');
+
     document.getElementById('result').innerHTML =
       '<div class="bg-white shadow-sm rounded p-4 p-md-5 mb-4">' +
         '<div class="d-flex justify-content-between flex-wrap gap-3 align-items-start">' +
           '<div><div class="text-uppercase small text-muted fw-bold">Tracking ID</div>' +
-          '<div class="h3 fw-bold mb-0">' + esc(d.id) + '</div></div>' +
-          '<span class="status-pill"><span class="dot"></span>' + esc(current.label) + '</span>' +
+          '<div class="h3 fw-bold mb-0">' + esc(d.shipment.tracking_number) + '</div></div>' +
+          '<span class="status-pill"><span class="dot"></span>' + esc(d.shipment.status) + '</span>' +
         '</div>' +
         '<hr/>' +
         '<div class="row g-4">' +
-          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Origin</div><div class="fw-semibold">' + esc(d.origin) + '</div></div>' +
-          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Destination</div><div class="fw-semibold">' + esc(d.destination) + '</div></div>' +
-          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">ETA</div><div class="fw-semibold">' + esc(d.eta) + '</div></div>' +
-          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Carrier</div><div class="fw-semibold">' + esc(d.carrier) + '</div></div>' +
+          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Origin</div><div class="fw-semibold">' + esc(d.shipment.origin) + '</div></div>' +
+          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Destination</div><div class="fw-semibold">' + esc(d.shipment.destination) + '</div></div>' +
+          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">ETA</div><div class="fw-semibold">' + esc(d.shipment.eta ? fmt(d.shipment.eta) : '—') + '</div></div>' +
+          '<div class="col-6 col-md-3"><div class="small text-muted text-uppercase fw-bold">Carrier</div><div class="fw-semibold">' + esc(d.shipment.carrier) + '</div></div>' +
         '</div>' +
       '</div>' +
-      '<div class="bg-white shadow-sm rounded p-4 p-md-5">' +
-        '<h4 class="fw-bold mb-4">Shipment timeline</h4>' +
-        '<div class="timeline">' + rows + '</div>' +
-      '</div>';
+      (stages.length ?
+        '<div class="bg-white shadow-sm rounded p-4 p-md-5">' +
+          '<h4 class="fw-bold mb-4">Shipment timeline</h4>' +
+          '<div class="timeline">' + rows + '</div>' +
+        '</div>'
+        : '<div class="alert alert-light border">No timeline events have been logged yet.</div>'
+      );
   }
+
+  function setStatus(html) {
+    var el = document.getElementById('status');
+    if (!html) { el.style.display = 'none'; return; }
+    el.innerHTML = html; el.style.display = 'block';
+  }
+
+  function lookup(id) {
+    document.getElementById('result').innerHTML = '';
+    document.getElementById('empty').style.display = 'none';
+    setStatus('<div class="text-muted small"><i class="bi bi-hourglass-split"></i> Looking up ' + esc(id) + '…</div>');
+    fetch('/api/public/track?id=' + encodeURIComponent(id))
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
+      .then(function (res) {
+        setStatus('');
+        if (res.status === 404 || res.body.found === false) {
+          document.getElementById('result').innerHTML =
+            '<div class="bg-white shadow-sm rounded p-5 text-center">' +
+              '<i class="bi bi-exclamation-circle" style="font-size:48px;color:#ff6b00"></i>' +
+              '<h4 class="fw-bold mt-3">No shipment found</h4>' +
+              '<p class="text-muted">We could not find a shipment with tracking number <strong>' + esc(id) + '</strong>. Please check the number and try again.</p>' +
+            '</div>';
+          return;
+        }
+        if (!res.ok) {
+          setStatus('<div class="text-danger">' + esc(res.body.error || 'Lookup failed') + '</div>');
+          return;
+        }
+        render(res.body);
+      })
+      .catch(function () { setStatus('<div class="text-danger">Network error. Please try again.</div>'); });
+  }
+
   var id = getParam('id');
-  if (id) { render(id); document.getElementById('trackInput').value = id; }
+  if (id) { document.getElementById('trackInput').value = id; lookup(id); }
   else { document.getElementById('empty').style.display = 'block'; }
   document.getElementById('trackForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var v = document.getElementById('trackInput').value.trim();
     if (!v) return;
     history.replaceState(null, '', 'track.html?id=' + encodeURIComponent(v));
-    render(v);
+    lookup(v);
   });
 })();
 </script>
