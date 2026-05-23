@@ -294,7 +294,8 @@
     host.innerHTML =
       '<div class="map-placeholder">' +
         '<i class="bi bi-exclamation-triangle"></i>' +
-        '<p class="mt-2 mb-0 small">' + esc(msg) + '</p>' +
+        '<p class="mt-2 mb-1 small fw-semibold">' + esc(msg) + '</p>' +
+        '<p class="mb-0 small text-muted">Your shipment status and full activity log are still up to date on the right — the live map view will return automatically.</p>' +
       '</div>';
   }
 
@@ -303,7 +304,15 @@
     if (!mapHost) return;
     pendingMapEvents = events;
 
+    var timedOut = false;
+    var timeoutId = setTimeout(function () {
+      timedOut = true;
+      showMapError("The live map is taking longer than usual to load.");
+    }, 10000);
+
     loadGoogleMaps().then(function (gmaps) {
+      clearTimeout(timeoutId);
+      if (timedOut) return;
       var evs = pendingMapEvents || events;
       var withCoords = evs.filter(function (e) { return e.latitude != null && e.longitude != null; });
       var defaultCenter = { lat: 50.1109, lng: 8.6821 }; // Frankfurt
@@ -377,8 +386,9 @@
         map.fitBounds(bounds, 40);
       }
     }).catch(function (err) {
+      clearTimeout(timeoutId);
       console.error('[track] Google Maps load failed', err);
-      showMapError("We couldn't load the map right now. Please refresh the page.");
+      showMapError("We couldn't load the live map right now.");
     });
   }
 
