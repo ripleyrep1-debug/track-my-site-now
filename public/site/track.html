@@ -355,6 +355,10 @@
 
     var sig = JSON.stringify({ s: d.shipment.status, e: stages.map(function(x){return [x.label,x.event_time,x.latitude,x.longitude];}) });
     var changed = sig !== lastSig;
+
+    // Only re-render the result HTML when the payload actually changed.
+    // Re-rendering on every poll destroys the #map DOM node and the map turns blank.
+    if (!changed) { return; }
     lastSig = sig;
 
     document.getElementById('result').innerHTML =
@@ -416,12 +420,15 @@
         '</div>' +
       '</div>';
 
-    if (changed) { map = null; clearMapOverlays(); }
+    // We only get here on a real change, so the #map node was just re-created. Reset and rebuild.
+    map = null;
+    clearMapOverlays();
     setTimeout(function(){
       if (typeof google !== 'undefined' && google.maps) { renderMap(stages); }
       else { window.__gmapsReady.then(function(){ renderMap(stages); }); }
     }, 0);
   }
+
 
   function setStatus(html) {
     var el = document.getElementById('status');
