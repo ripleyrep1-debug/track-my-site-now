@@ -1,10 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { createSupabaseAnonServerClient } from "@/integrations/supabase/client.anon.server";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
+};
+
+type LookupResult = {
+  found?: boolean;
+  error?: string;
+  shipment?: Record<string, unknown>;
+  events?: unknown[];
 };
 
 export const Route = createFileRoute("/api/public/track")({
@@ -17,26 +24,30 @@ export const Route = createFileRoute("/api/public/track")({
         if (!id || id.length > 64) {
           return Response.json({ error: "Invalid tracking number" }, { status: 400, headers: cors });
         }
-        const { data: shipment, error } = await supabaseAdmin
-          .from("shipments")
-          .select("id, tracking_number, customer_name, origin, destination, carrier, status, eta, service, weight")
-          .eq("tracking_number", id)
-          .maybeSingle();
+
+        const supabase = createSupabaseAnonServerClient();
+        const { data, error } = await supabase.rpc("lookup_tracking", {
+          p_tracking_number: id,
+        });
+
         if (error) {
+          console.error("[track]", error.message);
           return Response.json({ error: "Lookup failed" }, { status: 500, headers: cors });
         }
-        if (!shipment) {
+
+        const result = data as LookupResult | null;
+        if (!result) {
           return Response.json({ found: false }, { headers: cors });
         }
-        const { data: events } = await supabaseAdmin
-          .from("shipment_events")
-          .select("label, location, event_time, sequence, latitude, longitude")
-          .eq("shipment_id", shipment.id)
-          .order("sequence", { ascending: true })
-          .order("event_time", { ascending: true });
-        const { id: _drop, ...publicShipment } = shipment;
+        if (result.error) {
+          return Response.json({ error: result.error }, { status: 400, headers: cors });
+        }
+        if (!result.found) {
+          return Response.json({ found: false }, { headers: cors });
+        }
+
         return Response.json(
-          { found: true, shipment: publicShipment, events: events ?? [] },
+          { found: true, shipment: result.shipment, events: result.events ?? [] },
           { headers: cors },
         );
       },

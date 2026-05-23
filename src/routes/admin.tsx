@@ -83,7 +83,7 @@ function AdminPage() {
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
         <div className="max-w-md bg-white p-8 rounded shadow text-center">
           <h1 className="text-xl font-bold mb-2">Admin access required</h1>
-          {status.data?.adminCount === 0 ? (
+          {status.data?.canClaimAdmin ? (
             <>
               <p className="text-sm text-slate-600 mb-4">No admin exists yet. Claim the admin role for this account to manage shipments.</p>
               <button
