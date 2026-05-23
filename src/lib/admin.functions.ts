@@ -74,7 +74,7 @@ const ShipmentInput = z.object({
   customer_email: z.string().email().max(200).optional().nullable().or(z.literal("")),
   origin: z.string().min(1).max(200),
   destination: z.string().min(1).max(200),
-  carrier: z.string().min(1).max(200).default("Logiport Express"),
+  carrier: z.string().min(1).max(200).default("Rapidexpresscargo Express"),
   status: z.string().min(1).max(100).default("Order received"),
   eta: z.string().optional().nullable().or(z.literal("")),
   weight: z.string().max(50).optional().nullable(),
