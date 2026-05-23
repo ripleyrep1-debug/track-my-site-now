@@ -1,0 +1,1 @@
+UPDATE shipments SET carrier='Rapidexpresscargo Express' WHERE carrier ILIKE '%logiport%';
