@@ -116,6 +116,11 @@ export const createShipment = createServerFn({ method: "POST" })
       ...data,
       customer_email: data.customer_email || null,
       eta: data.eta ? new Date(data.eta).toISOString() : null,
+      ship_started_at: data.ship_started_at
+        ? new Date(data.ship_started_at).toISOString()
+        : data.auto_progress
+          ? new Date().toISOString()
+          : null,
     };
     const { data: row, error } = await supabase.from("shipments").insert(payload).select().single();
     if (error) {
