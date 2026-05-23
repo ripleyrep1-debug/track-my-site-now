@@ -60,6 +60,7 @@ export type Database = {
       }
       shipments: {
         Row: {
+          auto_progress: boolean
           carrier: string
           created_at: string
           customer_email: string | null
@@ -69,13 +70,17 @@ export type Database = {
           id: string
           notes: string | null
           origin: string
+          origin_warehouse: string | null
           service: string | null
+          ship_started_at: string | null
           status: string
           tracking_number: string
+          transit_days: number | null
           updated_at: string
           weight: string | null
         }
         Insert: {
+          auto_progress?: boolean
           carrier?: string
           created_at?: string
           customer_email?: string | null
@@ -85,13 +90,17 @@ export type Database = {
           id?: string
           notes?: string | null
           origin: string
+          origin_warehouse?: string | null
           service?: string | null
+          ship_started_at?: string | null
           status?: string
           tracking_number: string
+          transit_days?: number | null
           updated_at?: string
           weight?: string | null
         }
         Update: {
+          auto_progress?: boolean
           carrier?: string
           created_at?: string
           customer_email?: string | null
@@ -101,9 +110,12 @@ export type Database = {
           id?: string
           notes?: string | null
           origin?: string
+          origin_warehouse?: string | null
           service?: string | null
+          ship_started_at?: string | null
           status?: string
           tracking_number?: string
+          transit_days?: number | null
           updated_at?: string
           weight?: string | null
         }
@@ -136,6 +148,7 @@ export type Database = {
     }
     Functions: {
       admin_exists: { Args: never; Returns: boolean }
+      advance_auto_shipments: { Args: never; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
