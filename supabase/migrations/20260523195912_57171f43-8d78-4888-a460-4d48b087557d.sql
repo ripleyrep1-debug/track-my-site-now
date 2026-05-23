@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.lookup_tracking(text) FROM anon, authenticated, PUBLIC;
