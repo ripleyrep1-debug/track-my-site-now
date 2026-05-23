@@ -100,6 +100,10 @@ const ShipmentInput = z.object({
   weight: z.string().max(50).optional().nullable(),
   service: z.string().max(100).optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
+  origin_warehouse: z.enum(["Greece", "Poland", "Germany"]).optional().nullable(),
+  transit_days: z.number().int().min(3).max(7).optional().nullable(),
+  auto_progress: z.boolean().optional().default(false),
+  ship_started_at: z.string().optional().nullable().or(z.literal("")),
 });
 
 export const createShipment = createServerFn({ method: "POST" })
