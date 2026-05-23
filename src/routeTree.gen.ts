@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiPublicTrackRouteImport } from './routes/api/public/track'
+import { Route as ApiPublicMapsKeyRouteImport } from './routes/api/public/maps-key'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -34,17 +35,24 @@ const ApiPublicTrackRoute = ApiPublicTrackRouteImport.update({
   path: '/api/public/track',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicMapsKeyRoute = ApiPublicMapsKeyRouteImport.update({
+  id: '/api/public/maps-key',
+  path: '/api/public/maps-key',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/api/public/maps-key': typeof ApiPublicMapsKeyRoute
   '/api/public/track': typeof ApiPublicTrackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/api/public/maps-key': typeof ApiPublicMapsKeyRoute
   '/api/public/track': typeof ApiPublicTrackRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,33 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
+  '/api/public/maps-key': typeof ApiPublicMapsKeyRoute
   '/api/public/track': typeof ApiPublicTrackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/auth' | '/api/public/track'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/api/public/maps-key'
+    | '/api/public/track'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/auth' | '/api/public/track'
-  id: '__root__' | '/' | '/admin' | '/auth' | '/api/public/track'
+  to: '/' | '/admin' | '/auth' | '/api/public/maps-key' | '/api/public/track'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/auth'
+    | '/api/public/maps-key'
+    | '/api/public/track'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
+  ApiPublicMapsKeyRoute: typeof ApiPublicMapsKeyRoute
   ApiPublicTrackRoute: typeof ApiPublicTrackRoute
 }
 
@@ -99,6 +120,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicTrackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/maps-key': {
+      id: '/api/public/maps-key'
+      path: '/api/public/maps-key'
+      fullPath: '/api/public/maps-key'
+      preLoaderRoute: typeof ApiPublicMapsKeyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -106,6 +134,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
+  ApiPublicMapsKeyRoute: ApiPublicMapsKeyRoute,
   ApiPublicTrackRoute: ApiPublicTrackRoute,
 }
 export const routeTree = rootRouteImport

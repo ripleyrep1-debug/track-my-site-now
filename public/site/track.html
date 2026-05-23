@@ -6,8 +6,7 @@
 <title>Track Shipment - Rapidexpresscargo</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <link href="assets/css/bootstrap.min.css" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<!-- Google Maps JS API is loaded dynamically below once we fetch the browser key from /api/public/maps-key -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -201,9 +200,11 @@
   var pollTimer = null;
   var map = null;
   var mapMarkers = [];
-  var mapPolylines = [];
+  var mapPolyline = null;
   var infoWindow = null;
   var lastSig = '';
+  var googleMapsReady = null; // promise that resolves when google.maps is available
+  var pendingMapEvents = null; // events queued while google maps still loading
 
   // Canonical 6-step shipment journey with icons
   var JOURNEY = [
@@ -245,72 +246,140 @@
     '</div>';
   }
 
-  function clearMapOverlays() {
-    mapMarkers.forEach(function(m){ if (map) map.removeLayer(m); });
-    mapMarkers = [];
-    mapPolylines.forEach(function(p){ if (map) map.removeLayer(p); });
-    mapPolylines = [];
+  // ── Google Maps loader ───────────────────────────────────────────────
+  // Fetch the connector-managed browser API key from our own endpoint and
+  // inject the Maps JS script with loading=async + callback (the required
+  // pattern when using async load).
+  function loadGoogleMaps() {
+    if (googleMapsReady) return googleMapsReady;
+    googleMapsReady = new Promise(function (resolve, reject) {
+      if (window.google && window.google.maps) { resolve(window.google.maps); return; }
+      window.__lgpInitMap = function () { resolve(window.google.maps); };
+      fetch('/api/public/maps-key')
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          if (!j || !j.key) { reject(new Error('Missing Google Maps key')); return; }
+          var s = document.createElement('script');
+          s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(j.key) + '&loading=async&callback=__lgpInitMap';
+          s.async = true;
+          s.defer = true;
+          s.onerror = function () { reject(new Error('Failed to load Google Maps script')); };
+          document.head.appendChild(s);
+        })
+        .catch(reject);
+    });
+    return googleMapsReady;
   }
 
-  function dotIcon(color, size, pulsing) {
-    var svg =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' +
-        (pulsing ? '<circle cx="' + (size/2) + '" cy="' + (size/2) + '" r="' + (size/2 - 1) + '" fill="' + color + '" opacity="0.3"><animate attributeName="r" from="' + (size/2 - 8) + '" to="' + (size/2 - 1) + '" dur="1.4s" repeatCount="indefinite"/><animate attributeName="opacity" from="0.6" to="0" dur="1.4s" repeatCount="indefinite"/></circle>' : '') +
-        '<circle cx="' + (size/2) + '" cy="' + (size/2) + '" r="' + (size/2 - 5) + '" fill="' + color + '" stroke="#fff" stroke-width="3"/>' +
-      '</svg>';
-    return L.icon({
-      iconUrl: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
-      iconSize: [size, size],
-      iconAnchor: [size/2, size/2],
-      popupAnchor: [0, -size/2],
-    });
+  function clearMapOverlays() {
+    mapMarkers.forEach(function(m){ m.setMap(null); });
+    mapMarkers = [];
+    if (mapPolyline) { mapPolyline.setMap(null); mapPolyline = null; }
+  }
+
+  function dotMarkerIcon(g, color, size, withRing) {
+    return {
+      path: g.SymbolPath.CIRCLE,
+      scale: size / 2,
+      fillColor: color,
+      fillOpacity: 1,
+      strokeColor: '#ffffff',
+      strokeWeight: withRing ? 4 : 2,
+    };
+  }
+
+  function showMapError(msg) {
+    var host = document.getElementById('map');
+    if (!host) return;
+    host.innerHTML =
+      '<div class="map-placeholder">' +
+        '<i class="bi bi-exclamation-triangle"></i>' +
+        '<p class="mt-2 mb-0 small">' + esc(msg) + '</p>' +
+      '</div>';
   }
 
   function renderMap(events) {
     var mapHost = document.getElementById('map');
-    if (!mapHost || typeof L === 'undefined') return;
-    var withCoords = events.filter(function (e) { return e.latitude != null && e.longitude != null; });
-    var defaultCenter = [50.1109, 8.6821]; // Frankfurt
+    if (!mapHost) return;
+    pendingMapEvents = events;
 
-    if (!map) {
-      map = L.map(mapHost, { scrollWheelZoom: false, zoomControl: true }).setView(defaultCenter, 5);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-      }).addTo(map);
-    }
-    clearMapOverlays();
+    loadGoogleMaps().then(function (gmaps) {
+      var evs = pendingMapEvents || events;
+      var withCoords = evs.filter(function (e) { return e.latitude != null && e.longitude != null; });
+      var defaultCenter = { lat: 50.1109, lng: 8.6821 }; // Frankfurt
 
-    if (!withCoords.length) {
-      var hub = L.marker(defaultCenter, { icon: dotIcon('#232526', 22, false) }).addTo(map);
-      hub.bindPopup('<div class="map-popup"><strong>Frankfurt Hub</strong><br><small>Awaiting first scan…</small></div>');
-      mapMarkers.push(hub);
-      map.setView(defaultCenter, 5);
-      setTimeout(function(){ map.invalidateSize(); }, 50);
-      return;
-    }
+      if (!map) {
+        map = new gmaps.Map(mapHost, {
+          center: defaultCenter,
+          zoom: 5,
+          scrollwheel: false,
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+        });
+        infoWindow = new gmaps.InfoWindow();
+      }
+      clearMapOverlays();
 
-    var path = withCoords.map(function (e) { return [e.latitude, e.longitude]; });
-    var solid = L.polyline(path, { color: '#FD5523', weight: 4, opacity: 0.9 }).addTo(map);
-    mapPolylines.push(solid);
+      if (!withCoords.length) {
+        var hub = new gmaps.Marker({
+          position: defaultCenter,
+          map: map,
+          icon: dotMarkerIcon(gmaps, '#232526', 22, false),
+          title: 'Frankfurt Hub',
+        });
+        hub.addListener('click', function () {
+          infoWindow.setContent('<div class="map-popup"><strong>Frankfurt Hub</strong><br><small>Awaiting first scan…</small></div>');
+          infoWindow.open(map, hub);
+        });
+        mapMarkers.push(hub);
+        map.setCenter(defaultCenter);
+        map.setZoom(5);
+        return;
+      }
 
-    withCoords.forEach(function (e, i) {
-      var isLast = i === withCoords.length - 1;
-      var marker = L.marker([e.latitude, e.longitude], {
-        icon: dotIcon(isLast ? '#FD5523' : '#232526', isLast ? 32 : 20, isLast),
-        zIndexOffset: isLast ? 1000 : 0,
-        title: e.label,
-      }).addTo(map);
-      marker.bindPopup(
-        '<div class="map-popup"><strong>' + esc(e.label) + '</strong><br>' +
-        esc(e.location || '') + '<br><small>' + esc(fmt(e.event_time)) + '</small></div>'
-      );
-      mapMarkers.push(marker);
+      var path = withCoords.map(function (e) { return { lat: Number(e.latitude), lng: Number(e.longitude) }; });
+      mapPolyline = new gmaps.Polyline({
+        path: path,
+        geodesic: true,
+        strokeColor: '#FD5523',
+        strokeOpacity: 0.95,
+        strokeWeight: 4,
+        map: map,
+      });
+
+      withCoords.forEach(function (e, i) {
+        var isLast = i === withCoords.length - 1;
+        var marker = new gmaps.Marker({
+          position: { lat: Number(e.latitude), lng: Number(e.longitude) },
+          map: map,
+          icon: dotMarkerIcon(gmaps, isLast ? '#FD5523' : '#232526', isLast ? 30 : 20, isLast),
+          zIndex: isLast ? 1000 : 1,
+          title: e.label,
+          animation: isLast ? gmaps.Animation.DROP : null,
+        });
+        marker.addListener('click', function () {
+          infoWindow.setContent(
+            '<div class="map-popup"><strong>' + esc(e.label) + '</strong><br>' +
+            esc(e.location || '') + '<br><small>' + esc(fmt(e.event_time)) + '</small></div>'
+          );
+          infoWindow.open(map, marker);
+        });
+        mapMarkers.push(marker);
+      });
+
+      if (path.length === 1) {
+        map.setCenter(path[0]);
+        map.setZoom(7);
+      } else {
+        var bounds = new gmaps.LatLngBounds();
+        path.forEach(function (p) { bounds.extend(p); });
+        map.fitBounds(bounds, 40);
+      }
+    }).catch(function (err) {
+      console.error('[track] Google Maps load failed', err);
+      showMapError("We couldn't load the map right now. Please refresh the page.");
     });
-
-    if (path.length === 1) { map.setView(path[0], 7); }
-    else { map.fitBounds(L.latLngBounds(path), { padding: [40, 40] }); }
-    setTimeout(function(){ map.invalidateSize(); }, 50);
   }
 
   function render(d) {
@@ -396,10 +465,9 @@
       '</div>';
 
     // We only get here on a real change, so the #map node was just re-created. Reset and rebuild.
-    if (map) { try { map.remove(); } catch(e){} }
     map = null;
     mapMarkers = [];
-    mapPolylines = [];
+    mapPolyline = null;
     setTimeout(function(){ renderMap(stages); }, 0);
   }
 
@@ -457,7 +525,7 @@
     var v = document.getElementById('trackInput').value.trim();
     if (!v) return;
     history.replaceState(null, '', 'track.html?id=' + encodeURIComponent(v));
-    lastSig = ''; if (map) { try { map.remove(); } catch(e){} } map = null; mapMarkers = []; mapPolylines = [];
+    lastSig = ''; map = null; mapMarkers = []; mapPolyline = null;
     document.getElementById('result').innerHTML = '';
     lookup(v); startPoll(v);
   });
