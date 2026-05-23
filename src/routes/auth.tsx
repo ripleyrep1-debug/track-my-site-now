@@ -6,10 +6,9 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
-const ADMIN_EMAIL = "support@rapidexprescargoagency.com";
-
 function AuthPage() {
   const nav = useNavigate();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -25,7 +24,7 @@ function AuthPage() {
     setError(null);
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: ADMIN_EMAIL, password });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       nav({ to: "/admin" });
     } catch (err) {
@@ -43,7 +42,12 @@ function AuthPage() {
         <p className="text-sm text-slate-500 mb-6">Rapidexpresscargo shipment management</p>
         <form onSubmit={submit} className="space-y-3">
           <input
-            type="password" required minLength={6} autoFocus
+            type="email" required autoFocus autoComplete="email"
+            value={email} onChange={(e) => setEmail(e.target.value)}
+            placeholder="Admin email" className="w-full border rounded px-3 py-2"
+          />
+          <input
+            type="password" required minLength={6} autoComplete="current-password"
             value={password} onChange={(e) => setPassword(e.target.value)}
             placeholder="Admin password" className="w-full border rounded px-3 py-2"
           />
