@@ -465,10 +465,9 @@
       '</div>';
 
     // We only get here on a real change, so the #map node was just re-created. Reset and rebuild.
-    if (map) { try { map.remove(); } catch(e){} }
     map = null;
     mapMarkers = [];
-    mapPolylines = [];
+    mapPolyline = null;
     setTimeout(function(){ renderMap(stages); }, 0);
   }
 
