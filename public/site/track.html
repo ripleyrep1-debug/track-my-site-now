@@ -386,8 +386,9 @@
         map.fitBounds(bounds, 40);
       }
     }).catch(function (err) {
+      clearTimeout(timeoutId);
       console.error('[track] Google Maps load failed', err);
-      showMapError("We couldn't load the map right now. Please refresh the page.");
+      showMapError("We couldn't load the live map right now.");
     });
   }
 
