@@ -59,6 +59,10 @@ function AdminPage() {
     tracking_number: "", customer_name: "", customer_email: "",
     origin: "", destination: "", carrier: "Rapidexpresscargo Express",
     status: "Order received", eta: "", service: "", weight: "", notes: "",
+    origin_warehouse: "" as "" | "Greece" | "Poland" | "Germany",
+    transit_days: 5,
+    auto_progress: true,
+    ship_started_at: "",
   });
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -66,8 +70,14 @@ function AdminPage() {
     e.preventDefault();
     setFormError(null);
     try {
-      await createFn({ data: form });
-      setForm({ ...form, tracking_number: "", customer_name: "", customer_email: "", origin: "", destination: "", eta: "", notes: "" });
+      const payload = {
+        ...form,
+        origin_warehouse: form.origin_warehouse || null,
+        transit_days: form.auto_progress ? form.transit_days : null,
+        ship_started_at: form.ship_started_at || null,
+      };
+      await createFn({ data: payload });
+      setForm({ ...form, tracking_number: "", customer_name: "", customer_email: "", origin: "", destination: "", eta: "", notes: "", ship_started_at: "" });
       qc.invalidateQueries({ queryKey: ["shipments"] });
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed");
