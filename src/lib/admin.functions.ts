@@ -155,15 +155,16 @@ export const getShipment = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as AuthContext;
-    await assertAdmin(supabase, userId);
-    const { data: shipment, error } = await supabase
+    const { userId } = context as AuthContext;
+    await assertAdmin(userId);
+    const db = getAdminDb();
+    const { data: shipment, error } = await db
       .from("shipments")
       .select("*")
       .eq("id", data.id)
       .single();
     if (error) fail("getShipment", error, "Shipment not found");
-    const { data: events } = await supabase
+    const { data: events } = await db
       .from("shipment_events")
       .select("*")
       .eq("shipment_id", data.id)
@@ -185,13 +186,13 @@ export const addEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => EventInput.parse(i))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as AuthContext;
-    await assertAdmin(supabase, userId);
+    const { userId } = context as AuthContext;
+    await assertAdmin(userId);
     const payload = {
       ...data,
       event_time: data.event_time ? new Date(data.event_time).toISOString() : new Date().toISOString(),
     };
-    const { error } = await supabase.from("shipment_events").insert(payload);
+    const { error } = await getAdminDb().from("shipment_events").insert(payload);
     if (error) fail("addEvent", error, "Could not add event");
     return { ok: true };
   });
@@ -200,9 +201,9 @@ export const deleteEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as AuthContext;
-    await assertAdmin(supabase, userId);
-    const { error } = await supabase.from("shipment_events").delete().eq("id", data.id);
+    const { userId } = context as AuthContext;
+    await assertAdmin(userId);
+    const { error } = await getAdminDb().from("shipment_events").delete().eq("id", data.id);
     if (error) fail("deleteEvent", error, "Could not delete event");
     return { ok: true };
   });
