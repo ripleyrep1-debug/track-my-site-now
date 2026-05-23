@@ -440,7 +440,7 @@
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
       .then(function (res) {
         setStatus('');
-        if (res.status === 404 || res.body.found === false) {
+        if (res.body.found === false) {
           stopPoll();
           document.getElementById('result').innerHTML =
             '<div class="card-premium">' +
