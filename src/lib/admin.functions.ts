@@ -98,8 +98,9 @@ export const createShipment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => ShipmentInput.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as AuthContext;
-    await assertAdmin(supabase, userId);
+    const { userId } = context as AuthContext;
+    await assertAdmin(userId);
+    const db = getAdminDb();
     const payload = {
       ...data,
       customer_email: data.customer_email || null,
@@ -110,7 +111,7 @@ export const createShipment = createServerFn({ method: "POST" })
           ? new Date().toISOString()
           : null,
     };
-    const { data: row, error } = await supabase.from("shipments").insert(payload).select().single();
+    const { data: row, error } = await db.from("shipments").insert(payload).select().single();
     if (error) {
       const code = (error as { code?: string }).code;
       if (code === "23505") throw new Error("A shipment with this tracking number already exists");
@@ -125,8 +126,8 @@ export const updateShipment = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid(), patch: ShipmentInput.partial() }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as AuthContext;
-    await assertAdmin(supabase, userId);
+    const { userId } = context as AuthContext;
+    await assertAdmin(userId);
     const patch = { ...data.patch } as Record<string, unknown>;
     if ("eta" in patch) patch.eta = patch.eta ? new Date(patch.eta as string).toISOString() : null;
     if ("customer_email" in patch && !patch.customer_email) patch.customer_email = null;
@@ -134,7 +135,7 @@ export const updateShipment = createServerFn({ method: "POST" })
       patch.ship_started_at = patch.ship_started_at
         ? new Date(patch.ship_started_at as string).toISOString()
         : null;
-    const { error } = await supabase.from("shipments").update(patch as never).eq("id", data.id);
+    const { error } = await getAdminDb().from("shipments").update(patch as never).eq("id", data.id);
     if (error) fail("updateShipment", error, "Could not update shipment");
     return { ok: true };
   });
@@ -143,9 +144,9 @@ export const deleteShipment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as AuthContext;
-    await assertAdmin(supabase, userId);
-    const { error } = await supabase.from("shipments").delete().eq("id", data.id);
+    const { userId } = context as AuthContext;
+    await assertAdmin(userId);
+    const { error } = await getAdminDb().from("shipments").delete().eq("id", data.id);
     if (error) fail("deleteShipment", error, "Could not delete shipment");
     return { ok: true };
   });
