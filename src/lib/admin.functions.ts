@@ -1,11 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { Database } from "@/integrations/supabase/types";
+import { adminAlreadyExists, getAdminDb, hasAdminRole } from "@/lib/admin.server";
 
 type AuthContext = {
-  supabase: SupabaseClient<Database>;
   userId: string;
 };
 
@@ -18,52 +16,42 @@ function fail(scope: string, error: unknown, generic = "Operation failed"): neve
   throw new Error(generic);
 }
 
-async function assertAdmin(supabase: SupabaseClient<Database>, userId: string) {
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userId)
-    .eq("role", "admin")
-    .maybeSingle();
-  if (error) fail("assertAdmin", error, "Authorization check failed");
-  if (!data) throw new Error("Forbidden: admin role required");
-}
-
-async function adminExists(supabase: SupabaseClient<Database>): Promise<boolean | null> {
-  const { data, error } = await supabase.rpc("admin_exists");
-  if (error) {
-    console.warn("[admin:adminExists] rpc unavailable:", error.message);
-    return null;
+async function assertAdmin(userId: string) {
+  let isAdmin = false;
+  try {
+    isAdmin = await hasAdminRole(userId);
+  } catch (error) {
+    fail("assertAdmin", error, "Authorization check failed");
   }
-  return !!data;
+  if (!isAdmin) throw new Error("Forbidden: admin role required");
 }
 
 export const getMyStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context as AuthContext;
-    const { data: roles, error: rolesError } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    if (rolesError) fail("getMyStatus", rolesError, "Could not load your account");
-
-    const isAdmin = !!roles?.some((r) => r.role === "admin");
-    const exists = await adminExists(supabase);
+    const { userId } = context as AuthContext;
+    let isAdmin = false;
+    let exists = true;
+    try {
+      [isAdmin, exists] = await Promise.all([hasAdminRole(userId), adminAlreadyExists()]);
+    } catch (error) {
+      fail("getMyStatus", error, "Could not load your account");
+    }
 
     return {
       userId,
       isAdmin,
-      adminCount: exists === true ? 1 : 0,
-      canClaimAdmin: !isAdmin && exists !== true,
+      adminCount: exists ? 1 : 0,
+      canClaimAdmin: !isAdmin && !exists,
     };
   });
 
 export const claimFirstAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context as AuthContext;
-    const { error } = await supabase.from("user_roles").insert({ user_id: userId, role: "admin" });
+    const { userId } = context as AuthContext;
+    if (await adminAlreadyExists()) throw new Error("An admin already exists");
+    const { error } = await getAdminDb().from("user_roles").insert({ user_id: userId, role: "admin" });
     if (error) {
       const code = (error as { code?: string }).code;
       if (code === "23505") throw new Error("An admin already exists");
@@ -75,9 +63,9 @@ export const claimFirstAdmin = createServerFn({ method: "POST" })
 export const listShipments = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId } = context as AuthContext;
-    await assertAdmin(supabase, userId);
-    const { data, error } = await supabase
+    const { userId } = context as AuthContext;
+    await assertAdmin(userId);
+    const { data, error } = await getAdminDb()
       .from("shipments")
       .select(
         "id, tracking_number, customer_name, customer_email, origin, destination, status, eta, updated_at",
@@ -110,8 +98,9 @@ export const createShipment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => ShipmentInput.parse(input))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as AuthContext;
-    await assertAdmin(supabase, userId);
+    const { userId } = context as AuthContext;
+    await assertAdmin(userId);
+    const db = getAdminDb();
     const payload = {
       ...data,
       customer_email: data.customer_email || null,
@@ -122,7 +111,7 @@ export const createShipment = createServerFn({ method: "POST" })
           ? new Date().toISOString()
           : null,
     };
-    const { data: row, error } = await supabase.from("shipments").insert(payload).select().single();
+    const { data: row, error } = await db.from("shipments").insert(payload).select().single();
     if (error) {
       const code = (error as { code?: string }).code;
       if (code === "23505") throw new Error("A shipment with this tracking number already exists");
@@ -137,8 +126,8 @@ export const updateShipment = createServerFn({ method: "POST" })
     z.object({ id: z.string().uuid(), patch: ShipmentInput.partial() }).parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as AuthContext;
-    await assertAdmin(supabase, userId);
+    const { userId } = context as AuthContext;
+    await assertAdmin(userId);
     const patch = { ...data.patch } as Record<string, unknown>;
     if ("eta" in patch) patch.eta = patch.eta ? new Date(patch.eta as string).toISOString() : null;
     if ("customer_email" in patch && !patch.customer_email) patch.customer_email = null;
@@ -146,7 +135,7 @@ export const updateShipment = createServerFn({ method: "POST" })
       patch.ship_started_at = patch.ship_started_at
         ? new Date(patch.ship_started_at as string).toISOString()
         : null;
-    const { error } = await supabase.from("shipments").update(patch as never).eq("id", data.id);
+    const { error } = await getAdminDb().from("shipments").update(patch as never).eq("id", data.id);
     if (error) fail("updateShipment", error, "Could not update shipment");
     return { ok: true };
   });
@@ -155,9 +144,9 @@ export const deleteShipment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as AuthContext;
-    await assertAdmin(supabase, userId);
-    const { error } = await supabase.from("shipments").delete().eq("id", data.id);
+    const { userId } = context as AuthContext;
+    await assertAdmin(userId);
+    const { error } = await getAdminDb().from("shipments").delete().eq("id", data.id);
     if (error) fail("deleteShipment", error, "Could not delete shipment");
     return { ok: true };
   });
@@ -166,15 +155,16 @@ export const getShipment = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as AuthContext;
-    await assertAdmin(supabase, userId);
-    const { data: shipment, error } = await supabase
+    const { userId } = context as AuthContext;
+    await assertAdmin(userId);
+    const db = getAdminDb();
+    const { data: shipment, error } = await db
       .from("shipments")
       .select("*")
       .eq("id", data.id)
       .single();
     if (error) fail("getShipment", error, "Shipment not found");
-    const { data: events } = await supabase
+    const { data: events } = await db
       .from("shipment_events")
       .select("*")
       .eq("shipment_id", data.id)
@@ -196,13 +186,13 @@ export const addEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => EventInput.parse(i))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as AuthContext;
-    await assertAdmin(supabase, userId);
+    const { userId } = context as AuthContext;
+    await assertAdmin(userId);
     const payload = {
       ...data,
       event_time: data.event_time ? new Date(data.event_time).toISOString() : new Date().toISOString(),
     };
-    const { error } = await supabase.from("shipment_events").insert(payload);
+    const { error } = await getAdminDb().from("shipment_events").insert(payload);
     if (error) fail("addEvent", error, "Could not add event");
     return { ok: true };
   });
@@ -211,9 +201,9 @@ export const deleteEvent = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: unknown) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as AuthContext;
-    await assertAdmin(supabase, userId);
-    const { error } = await supabase.from("shipment_events").delete().eq("id", data.id);
+    const { userId } = context as AuthContext;
+    await assertAdmin(userId);
+    const { error } = await getAdminDb().from("shipment_events").delete().eq("id", data.id);
     if (error) fail("deleteEvent", error, "Could not delete event");
     return { ok: true };
   });

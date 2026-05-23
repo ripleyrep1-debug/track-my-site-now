@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -85,7 +85,7 @@ function AdminPage() {
   }
 
   if (!sessionReady) return <div className="p-8">Loading…</div>;
-  if (!signedIn) return null;
+  if (!signedIn) return <Navigate to="/auth" />;
 
   if (status.isLoading) return <div className="p-8">Checking access…</div>;
   if (!status.data?.isAdmin) {
