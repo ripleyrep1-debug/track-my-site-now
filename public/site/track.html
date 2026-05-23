@@ -6,7 +6,9 @@
 <title>Track Shipment - Rapidexpresscargo</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <link href="assets/css/bootstrap.min.css" rel="stylesheet">
-<!-- Google Maps JS API is loaded dynamically below once we fetch the browser key from /api/public/maps-key -->
+<!-- Leaflet (OpenStreetMap) — free, no API key required -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -246,46 +248,39 @@
     '</div>';
   }
 
-  // ── Google Maps loader ───────────────────────────────────────────────
-  // Fetch the connector-managed browser API key from our own endpoint and
-  // inject the Maps JS script with loading=async + callback (the required
-  // pattern when using async load).
-  function loadGoogleMaps() {
-    if (googleMapsReady) return googleMapsReady;
-    googleMapsReady = new Promise(function (resolve, reject) {
-      if (window.google && window.google.maps) { resolve(window.google.maps); return; }
-      window.__lgpInitMap = function () { resolve(window.google.maps); };
-      fetch('/api/public/maps-key')
-        .then(function (r) { return r.json(); })
-        .then(function (j) {
-          if (!j || !j.key) { reject(new Error('Missing Google Maps key')); return; }
-          var s = document.createElement('script');
-          s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(j.key) + '&loading=async&callback=__lgpInitMap';
-          s.async = true;
-          s.defer = true;
-          s.onerror = function () { reject(new Error('Failed to load Google Maps script')); };
-          document.head.appendChild(s);
-        })
-        .catch(reject);
+  // ── Leaflet (OpenStreetMap) loader ───────────────────────────────────
+  // Leaflet is loaded via <script defer> in <head>. This promise resolves
+  // as soon as window.L is available — no API key, no quota, fully free.
+  var leafletReady = null;
+  function loadLeaflet() {
+    if (leafletReady) return leafletReady;
+    leafletReady = new Promise(function (resolve, reject) {
+      var started = Date.now();
+      (function check() {
+        if (window.L) { resolve(window.L); return; }
+        if (Date.now() - started > 8000) { reject(new Error('Leaflet failed to load')); return; }
+        setTimeout(check, 100);
+      })();
     });
-    return googleMapsReady;
+    return leafletReady;
   }
 
   function clearMapOverlays() {
-    mapMarkers.forEach(function(m){ m.setMap(null); });
+    mapMarkers.forEach(function(m){ try { map.removeLayer(m); } catch(e){} });
     mapMarkers = [];
-    if (mapPolyline) { mapPolyline.setMap(null); mapPolyline = null; }
+    if (mapPolyline) { try { map.removeLayer(mapPolyline); } catch(e){} mapPolyline = null; }
   }
 
-  function dotMarkerIcon(g, color, size, withRing) {
-    return {
-      path: g.SymbolPath.CIRCLE,
-      scale: size / 2,
-      fillColor: color,
-      fillOpacity: 1,
-      strokeColor: '#ffffff',
-      strokeWeight: withRing ? 4 : 2,
-    };
+  function dotMarker(L, latlng, color, size, withRing, title) {
+    var ring = withRing ? 4 : 2;
+    var html = '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + color + ';border:' + ring + 'px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);"></div>';
+    var icon = L.divIcon({
+      className: 'lgp-dot-marker',
+      html: html,
+      iconSize: [size + ring*2, size + ring*2],
+      iconAnchor: [(size + ring*2)/2, (size + ring*2)/2],
+    });
+    return L.marker(latlng, { icon: icon, title: title || '' });
   }
 
   function showMapError(msg) {
@@ -294,8 +289,8 @@
     host.innerHTML =
       '<div class="map-placeholder">' +
         '<i class="bi bi-exclamation-triangle"></i>' +
-        '<p class="mt-2 mb-1 small fw-semibold">' + esc(msg) + '</p>' +
-        '<p class="mb-0 small text-muted">Your shipment status and full activity log are still up to date on the right — the live map view will return automatically.</p>' +
+        '<p class="mt-2 mb-1 small fw-semibold" style="color: var(--brand-navy);">' + esc(msg) + '</p>' +
+        '<p class="mb-0 small" style="color: var(--ink-soft);">Your shipment status and full activity log are still up to date on the right — the live map view will return automatically.</p>' +
       '</div>';
   }
 
@@ -310,87 +305,63 @@
       showMapError("The live map is taking longer than usual to load.");
     }, 10000);
 
-    loadGoogleMaps().then(function (gmaps) {
+    loadLeaflet().then(function (L) {
       clearTimeout(timeoutId);
       if (timedOut) return;
       var evs = pendingMapEvents || events;
       var withCoords = evs.filter(function (e) { return e.latitude != null && e.longitude != null; });
-      var defaultCenter = { lat: 50.1109, lng: 8.6821 }; // Frankfurt
+      var defaultCenter = [50.1109, 8.6821]; // Frankfurt
 
       if (!map) {
-        map = new gmaps.Map(mapHost, {
+        map = L.map(mapHost, {
           center: defaultCenter,
           zoom: 5,
-          scrollwheel: false,
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: false,
+          scrollWheelZoom: false,
+          zoomControl: true,
         });
-        infoWindow = new gmaps.InfoWindow();
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }).addTo(map);
       }
       clearMapOverlays();
 
       if (!withCoords.length) {
-        var hub = new gmaps.Marker({
-          position: defaultCenter,
-          map: map,
-          icon: dotMarkerIcon(gmaps, '#232526', 22, false),
-          title: 'Frankfurt Hub',
-        });
-        hub.addListener('click', function () {
-          infoWindow.setContent('<div class="map-popup"><strong>Frankfurt Hub</strong><br><small>Awaiting first scan…</small></div>');
-          infoWindow.open(map, hub);
-        });
+        var hub = dotMarker(L, defaultCenter, '#232526', 22, false, 'Frankfurt Hub').addTo(map);
+        hub.bindPopup('<div class="map-popup"><strong>Frankfurt Hub</strong><br><small>Awaiting first scan…</small></div>');
         mapMarkers.push(hub);
-        map.setCenter(defaultCenter);
-        map.setZoom(5);
+        map.setView(defaultCenter, 5);
         return;
       }
 
-      var path = withCoords.map(function (e) { return { lat: Number(e.latitude), lng: Number(e.longitude) }; });
-      mapPolyline = new gmaps.Polyline({
-        path: path,
-        geodesic: true,
-        strokeColor: '#FD5523',
-        strokeOpacity: 0.95,
-        strokeWeight: 4,
-        map: map,
-      });
+      var path = withCoords.map(function (e) { return [Number(e.latitude), Number(e.longitude)]; });
+      mapPolyline = L.polyline(path, { color: '#FD5523', weight: 4, opacity: 0.95 }).addTo(map);
 
       withCoords.forEach(function (e, i) {
         var isLast = i === withCoords.length - 1;
-        var marker = new gmaps.Marker({
-          position: { lat: Number(e.latitude), lng: Number(e.longitude) },
-          map: map,
-          icon: dotMarkerIcon(gmaps, isLast ? '#FD5523' : '#232526', isLast ? 30 : 20, isLast),
-          zIndex: isLast ? 1000 : 1,
-          title: e.label,
-          animation: isLast ? gmaps.Animation.DROP : null,
-        });
-        marker.addListener('click', function () {
-          infoWindow.setContent(
-            '<div class="map-popup"><strong>' + esc(e.label) + '</strong><br>' +
-            esc(e.location || '') + '<br><small>' + esc(fmt(e.event_time)) + '</small></div>'
-          );
-          infoWindow.open(map, marker);
-        });
-        mapMarkers.push(marker);
+        var m = dotMarker(L, [Number(e.latitude), Number(e.longitude)], isLast ? '#FD5523' : '#232526', isLast ? 30 : 20, isLast, e.label).addTo(map);
+        m.bindPopup(
+          '<div class="map-popup"><strong>' + esc(e.label) + '</strong><br>' +
+          esc(e.location || '') + '<br><small>' + esc(fmt(e.event_time)) + '</small></div>'
+        );
+        mapMarkers.push(m);
       });
 
       if (path.length === 1) {
-        map.setCenter(path[0]);
-        map.setZoom(7);
+        map.setView(path[0], 7);
       } else {
-        var bounds = new gmaps.LatLngBounds();
-        path.forEach(function (p) { bounds.extend(p); });
-        map.fitBounds(bounds, 40);
+        map.fitBounds(path, { padding: [40, 40] });
       }
+
+      // Leaflet sometimes needs a size refresh when its container was just inserted into the DOM
+      setTimeout(function(){ try { map.invalidateSize(); } catch(e){} }, 50);
     }).catch(function (err) {
       clearTimeout(timeoutId);
-      console.error('[track] Google Maps load failed', err);
+      console.error('[track] Leaflet load failed', err);
       showMapError("We couldn't load the live map right now.");
     });
   }
+
 
   function render(d) {
     var stages = (d.events || []).slice().sort(function(a,b){ return (a.sequence||0)-(b.sequence||0) || new Date(a.event_time)-new Date(b.event_time); });
