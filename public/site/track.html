@@ -6,6 +6,8 @@
 <title>Track Shipment - Rapidexpresscargo</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <link href="assets/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -195,9 +197,6 @@
 <script src="assets/js/jquery.min.js"></script>
 <script src="assets/js/bootstrap.min.js"></script>
 <script>
-  window.__gmapsReady = new Promise(function(resolve){ window.initRapidexGmaps = resolve; });
-</script>
-<script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBmvJph4LmrbtW7skeczzpBIyb9WWzFKo4&loading=async&callback=initRapidexGmaps&channel=47cc5d3c9328245dfb0f1fa8bd5ed619"></script>
 <script>
 (function () {
   var pollTimer = null;
@@ -248,94 +247,71 @@
   }
 
   function clearMapOverlays() {
-    mapMarkers.forEach(function(m){ m.setMap(null); });
+    mapMarkers.forEach(function(m){ if (map) map.removeLayer(m); });
     mapMarkers = [];
-    mapPolylines.forEach(function(p){ p.setMap(null); });
+    mapPolylines.forEach(function(p){ if (map) map.removeLayer(p); });
     mapPolylines = [];
   }
 
-  function dotMarker(color, size, pulsing) {
-    return {
-      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
-        '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' +
-          (pulsing ? '<circle cx="' + (size/2) + '" cy="' + (size/2) + '" r="' + (size/2 - 1) + '" fill="' + color + '" opacity="0.3"/>' : '') +
-          '<circle cx="' + (size/2) + '" cy="' + (size/2) + '" r="' + (size/2 - 5) + '" fill="' + color + '" stroke="#fff" stroke-width="3"/>' +
-        '</svg>'
-      ),
-      scaledSize: new google.maps.Size(size, size),
-      anchor: new google.maps.Point(size/2, size/2),
-    };
+  function dotIcon(color, size, pulsing) {
+    var svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' +
+        (pulsing ? '<circle cx="' + (size/2) + '" cy="' + (size/2) + '" r="' + (size/2 - 1) + '" fill="' + color + '" opacity="0.3"><animate attributeName="r" from="' + (size/2 - 8) + '" to="' + (size/2 - 1) + '" dur="1.4s" repeatCount="indefinite"/><animate attributeName="opacity" from="0.6" to="0" dur="1.4s" repeatCount="indefinite"/></circle>' : '') +
+        '<circle cx="' + (size/2) + '" cy="' + (size/2) + '" r="' + (size/2 - 5) + '" fill="' + color + '" stroke="#fff" stroke-width="3"/>' +
+      '</svg>';
+    return L.icon({
+      iconUrl: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg),
+      iconSize: [size, size],
+      iconAnchor: [size/2, size/2],
+      popupAnchor: [0, -size/2],
+    });
   }
 
   function renderMap(events) {
     var mapHost = document.getElementById('map');
-    if (!mapHost || typeof google === 'undefined' || !google.maps) return;
+    if (!mapHost || typeof L === 'undefined') return;
     var withCoords = events.filter(function (e) { return e.latitude != null && e.longitude != null; });
-    var defaultCenter = { lat: 50.1109, lng: 8.6821 }; // Frankfurt
+    var defaultCenter = [50.1109, 8.6821]; // Frankfurt
 
     if (!map) {
-      map = new google.maps.Map(mapHost, {
-        center: withCoords.length ? { lat: withCoords[0].latitude, lng: withCoords[0].longitude } : defaultCenter,
-        zoom: withCoords.length ? 4 : 5,
-        scrollwheel: false,
-        gestureHandling: 'cooperative',
-        mapTypeControl: true,
-        streetViewControl: false,
-        fullscreenControl: true,
-        zoomControl: true,
-      });
-      infoWindow = new google.maps.InfoWindow();
+      map = L.map(mapHost, { scrollWheelZoom: false, zoomControl: true }).setView(defaultCenter, 5);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(map);
     }
     clearMapOverlays();
 
     if (!withCoords.length) {
-      var hub = new google.maps.Marker({
-        position: defaultCenter, map: map,
-        icon: dotMarker('#232526', 22, false),
-        title: 'Frankfurt Hub',
-      });
-      hub.addListener('click', function(){
-        infoWindow.setContent('<div class="map-popup"><strong>Frankfurt Hub</strong><br><small>Awaiting first scan…</small></div>');
-        infoWindow.open(map, hub);
-      });
+      var hub = L.marker(defaultCenter, { icon: dotIcon('#232526', 22, false) }).addTo(map);
+      hub.bindPopup('<div class="map-popup"><strong>Frankfurt Hub</strong><br><small>Awaiting first scan…</small></div>');
       mapMarkers.push(hub);
-      map.setCenter(defaultCenter); map.setZoom(5);
+      map.setView(defaultCenter, 5);
+      setTimeout(function(){ map.invalidateSize(); }, 50);
       return;
     }
 
-    var path = withCoords.map(function (e) { return { lat: e.latitude, lng: e.longitude }; });
-    mapPolylines.push(new google.maps.Polyline({
-      path: path, map: map, strokeColor: '#FD5523', strokeOpacity: 0.9, strokeWeight: 4,
-    }));
-    mapPolylines.push(new google.maps.Polyline({
-      path: path, map: map, strokeColor: '#ffffff', strokeOpacity: 0, strokeWeight: 2,
-      icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.9, scale: 2 }, offset: '0', repeat: '14px' }],
-    }));
+    var path = withCoords.map(function (e) { return [e.latitude, e.longitude]; });
+    var solid = L.polyline(path, { color: '#FD5523', weight: 4, opacity: 0.9 }).addTo(map);
+    mapPolylines.push(solid);
 
     withCoords.forEach(function (e, i) {
       var isLast = i === withCoords.length - 1;
-      var marker = new google.maps.Marker({
-        position: { lat: e.latitude, lng: e.longitude }, map: map,
-        icon: dotMarker(isLast ? '#FD5523' : '#232526', isLast ? 32 : 20, isLast),
-        zIndex: isLast ? 999 : 10,
+      var marker = L.marker([e.latitude, e.longitude], {
+        icon: dotIcon(isLast ? '#FD5523' : '#232526', isLast ? 32 : 20, isLast),
+        zIndexOffset: isLast ? 1000 : 0,
         title: e.label,
-      });
-      marker.addListener('click', function () {
-        infoWindow.setContent(
-          '<div class="map-popup"><strong>' + esc(e.label) + '</strong><br>' +
-          esc(e.location || '') + '<br><small>' + esc(fmt(e.event_time)) + '</small></div>'
-        );
-        infoWindow.open(map, marker);
-      });
+      }).addTo(map);
+      marker.bindPopup(
+        '<div class="map-popup"><strong>' + esc(e.label) + '</strong><br>' +
+        esc(e.location || '') + '<br><small>' + esc(fmt(e.event_time)) + '</small></div>'
+      );
       mapMarkers.push(marker);
     });
 
-    if (path.length === 1) { map.setCenter(path[0]); map.setZoom(7); }
-    else {
-      var bounds = new google.maps.LatLngBounds();
-      path.forEach(function(p){ bounds.extend(p); });
-      map.fitBounds(bounds, 60);
-    }
+    if (path.length === 1) { map.setView(path[0], 7); }
+    else { map.fitBounds(L.latLngBounds(path), { padding: [40, 40] }); }
+    setTimeout(function(){ map.invalidateSize(); }, 50);
   }
 
   function render(d) {
@@ -421,12 +397,11 @@
       '</div>';
 
     // We only get here on a real change, so the #map node was just re-created. Reset and rebuild.
+    if (map) { try { map.remove(); } catch(e){} }
     map = null;
-    clearMapOverlays();
-    setTimeout(function(){
-      if (typeof google !== 'undefined' && google.maps) { renderMap(stages); }
-      else { window.__gmapsReady.then(function(){ renderMap(stages); }); }
-    }, 0);
+    mapMarkers = [];
+    mapPolylines = [];
+    setTimeout(function(){ renderMap(stages); }, 0);
   }
 
 
@@ -483,7 +458,7 @@
     var v = document.getElementById('trackInput').value.trim();
     if (!v) return;
     history.replaceState(null, '', 'track.html?id=' + encodeURIComponent(v));
-    lastSig = ''; map = null; clearMapOverlays();
+    lastSig = ''; if (map) { try { map.remove(); } catch(e){} } map = null; mapMarkers = []; mapPolylines = [];
     document.getElementById('result').innerHTML = '';
     lookup(v); startPoll(v);
   });
