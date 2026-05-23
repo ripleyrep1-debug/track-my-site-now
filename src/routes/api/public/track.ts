@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createSupabaseAnonServerClient } from "@/integrations/supabase/client.anon.server";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -25,29 +25,37 @@ export const Route = createFileRoute("/api/public/track")({
           return Response.json({ error: "Invalid tracking number" }, { status: 400, headers: cors });
         }
 
-        const supabase = createSupabaseAnonServerClient();
-        const { data, error } = await supabase.rpc("lookup_tracking", {
-          p_tracking_number: id,
-        });
+        const { data: shipment, error } = await supabaseAdmin
+          .from("shipments")
+          .select("id, tracking_number, customer_name, origin, destination, carrier, status, eta, service, weight")
+          .eq("tracking_number", id)
+          .maybeSingle();
 
         if (error) {
           console.error("[track]", error.message);
           return Response.json({ error: "Lookup failed" }, { status: 500, headers: cors });
         }
 
-        const result = data as LookupResult | null;
-        if (!result) {
-          return Response.json({ found: false }, { headers: cors });
-        }
-        if (result.error) {
-          return Response.json({ error: result.error }, { status: 400, headers: cors });
-        }
-        if (!result.found) {
+        if (!shipment) {
           return Response.json({ found: false }, { headers: cors });
         }
 
+        const { data: events, error: eventsError } = await supabaseAdmin
+          .from("shipment_events")
+          .select("label, location, event_time, sequence, latitude, longitude")
+          .eq("shipment_id", shipment.id)
+          .order("sequence", { ascending: true })
+          .order("event_time", { ascending: true });
+
+        if (eventsError) {
+          console.error("[track:events]", eventsError.message);
+          return Response.json({ error: "Lookup failed" }, { status: 500, headers: cors });
+        }
+
+        const { id: _id, ...publicShipment } = shipment;
+
         return Response.json(
-          { found: true, shipment: result.shipment, events: result.events ?? [] },
+          { found: true, shipment: publicShipment, events: events ?? [] },
           { headers: cors },
         );
       },
