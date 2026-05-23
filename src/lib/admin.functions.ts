@@ -142,6 +142,10 @@ export const updateShipment = createServerFn({ method: "POST" })
     const patch = { ...data.patch } as Record<string, unknown>;
     if ("eta" in patch) patch.eta = patch.eta ? new Date(patch.eta as string).toISOString() : null;
     if ("customer_email" in patch && !patch.customer_email) patch.customer_email = null;
+    if ("ship_started_at" in patch)
+      patch.ship_started_at = patch.ship_started_at
+        ? new Date(patch.ship_started_at as string).toISOString()
+        : null;
     const { error } = await supabase.from("shipments").update(patch as never).eq("id", data.id);
     if (error) fail("updateShipment", error, "Could not update shipment");
     return { ok: true };
