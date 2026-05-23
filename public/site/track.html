@@ -525,7 +525,7 @@
     var v = document.getElementById('trackInput').value.trim();
     if (!v) return;
     history.replaceState(null, '', 'track.html?id=' + encodeURIComponent(v));
-    lastSig = ''; if (map) { try { map.remove(); } catch(e){} } map = null; mapMarkers = []; mapPolylines = [];
+    lastSig = ''; map = null; mapMarkers = []; mapPolyline = null;
     document.getElementById('result').innerHTML = '';
     lookup(v); startPoll(v);
   });
