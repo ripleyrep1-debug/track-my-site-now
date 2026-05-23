@@ -6,26 +6,26 @@
 <title>Track Shipment - Rapidexpresscargo</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
 <link href="assets/css/bootstrap.min.css" rel="stylesheet">
-<link href="assets/css/style.css" rel="stylesheet">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Rubik:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="assets/css/style.css" rel="stylesheet">
 <style>
   :root {
-    --brand-orange: #ff6b00;
-    --brand-orange-dark: #e85d00;
-    --brand-orange-soft: #fff3e8;
-    --brand-navy: #0d2c54;
-    --brand-navy-dark: #081f3d;
-    --ink: #1a2238;
+    --brand-orange: #FD5523;
+    --brand-orange-dark: #e54712;
+    --brand-orange-soft: #fff1ec;
+    --brand-navy: #232526;
+    --brand-navy-dark: #15171a;
+    --ink: #232526;
     --ink-soft: #4b5563;
     --ink-muted: #6b7280;
     --line: #eef1f6;
     --line-strong: #e3e6ef;
     --bg-soft: #f7f9fc;
   }
-  body { color: var(--ink); font-family: 'Inter', -apple-system, sans-serif; background: var(--bg-soft); }
+  body.track-page { color: var(--ink); font-family: 'Poppins', sans-serif; background: var(--bg-soft); }
+  body.track-page h1, body.track-page h2, body.track-page h3, body.track-page h4, body.track-page h5, body.track-page h6 { font-family: 'Rubik', sans-serif; }
 
   /* Hero */
   .track-hero {
@@ -123,8 +123,10 @@
   .map-head .legend .lg { display: inline-flex; align-items: center; gap: 6px; }
   .map-head .legend .lg .swatch { width: 10px; height: 10px; border-radius: 50%; }
   #map { height: 520px; background: #eef1f6; }
-  .leaflet-popup-content { margin: 10px 14px; color: var(--ink); font-family: 'Inter', sans-serif; }
-  .leaflet-popup-content-wrapper { border-radius: 10px; }
+  .gm-style .gm-style-iw-c { font-family: 'Poppins', sans-serif !important; }
+  .map-popup { font-family: 'Poppins', sans-serif; padding: 4px 6px; }
+  .map-popup strong { color: var(--brand-navy); font-family: 'Rubik', sans-serif; }
+  .map-popup small { color: var(--ink-muted); }
 
   /* Activity log */
   .activity-card .head { padding: 22px 24px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
@@ -159,7 +161,7 @@
   .map-placeholder i { font-size: 42px; color: var(--brand-orange); }
 </style>
 </head>
-<body>
+<body class="track-page">
 
 <div class="track-hero">
   <div class="container">
@@ -192,12 +194,17 @@
 
 <script src="assets/js/jquery.min.js"></script>
 <script src="assets/js/bootstrap.min.js"></script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+  window.__gmapsReady = new Promise(function(resolve){ window.initRapidexGmaps = resolve; });
+</script>
+<script async src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBmvJph4LmrbtW7skeczzpBIyb9WWzFKo4&loading=async&callback=initRapidexGmaps&channel=47cc5d3c9328245dfb0f1fa8bd5ed619"></script>
 <script>
 (function () {
   var pollTimer = null;
   var map = null;
-  var mapLayer = null;
+  var mapMarkers = [];
+  var mapPolylines = [];
+  var infoWindow = null;
   var lastSig = '';
 
   // Canonical 6-step shipment journey with icons
@@ -240,57 +247,95 @@
     '</div>';
   }
 
-  function renderMap(events) {
-    var withCoords = events.filter(function (e) { return e.latitude != null && e.longitude != null; });
-    var mapHost = document.getElementById('map');
-    if (!mapHost) return;
+  function clearMapOverlays() {
+    mapMarkers.forEach(function(m){ m.setMap(null); });
+    mapMarkers = [];
+    mapPolylines.forEach(function(p){ p.setMap(null); });
+    mapPolylines = [];
+  }
 
-    // Default fallback: Frankfurt, Germany (major European logistics hub)
-    var defaultCenter = [50.1109, 8.6821];
+  function dotMarker(color, size, pulsing) {
+    return {
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' +
+          (pulsing ? '<circle cx="' + (size/2) + '" cy="' + (size/2) + '" r="' + (size/2 - 1) + '" fill="' + color + '" opacity="0.3"/>' : '') +
+          '<circle cx="' + (size/2) + '" cy="' + (size/2) + '" r="' + (size/2 - 5) + '" fill="' + color + '" stroke="#fff" stroke-width="3"/>' +
+        '</svg>'
+      ),
+      scaledSize: new google.maps.Size(size, size),
+      anchor: new google.maps.Point(size/2, size/2),
+    };
+  }
+
+  function renderMap(events) {
+    var mapHost = document.getElementById('map');
+    if (!mapHost || typeof google === 'undefined' || !google.maps) return;
+    var withCoords = events.filter(function (e) { return e.latitude != null && e.longitude != null; });
+    var defaultCenter = { lat: 50.1109, lng: 8.6821 }; // Frankfurt
 
     if (!map) {
-      map = L.map('map', { scrollWheelZoom: false, zoomControl: true })
-        .setView(withCoords.length ? [withCoords[0].latitude, withCoords[0].longitude] : defaultCenter, withCoords.length ? 4 : 6);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19, attribution: '&copy; OpenStreetMap'
-      }).addTo(map);
+      map = new google.maps.Map(mapHost, {
+        center: withCoords.length ? { lat: withCoords[0].latitude, lng: withCoords[0].longitude } : defaultCenter,
+        zoom: withCoords.length ? 4 : 5,
+        scrollwheel: false,
+        gestureHandling: 'cooperative',
+        mapTypeControl: true,
+        streetViewControl: false,
+        fullscreenControl: true,
+        zoomControl: true,
+      });
+      infoWindow = new google.maps.InfoWindow();
     }
-    if (mapLayer) { map.removeLayer(mapLayer); }
-    mapLayer = L.layerGroup().addTo(map);
+    clearMapOverlays();
 
     if (!withCoords.length) {
-      // Place a soft hub marker on Frankfurt as a contextual placeholder
-      var hubIcon = L.divIcon({
-        className: '',
-        html: '<div style="width:18px;height:18px;border-radius:50%;background:#0d2c54;border:3px solid #fff;box-shadow:0 0 0 2px rgba(13,44,84,.25)"></div>',
-        iconSize: [18, 18], iconAnchor: [9, 9]
+      var hub = new google.maps.Marker({
+        position: defaultCenter, map: map,
+        icon: dotMarker('#232526', 22, false),
+        title: 'Frankfurt Hub',
       });
-      L.marker(defaultCenter, { icon: hubIcon }).addTo(mapLayer)
-        .bindPopup('<strong>Frankfurt Hub</strong><br><small>Awaiting first scan…</small>');
-      map.setView(defaultCenter, 6);
+      hub.addListener('click', function(){
+        infoWindow.setContent('<div class="map-popup"><strong>Frankfurt Hub</strong><br><small>Awaiting first scan…</small></div>');
+        infoWindow.open(map, hub);
+      });
+      mapMarkers.push(hub);
+      map.setCenter(defaultCenter); map.setZoom(5);
       return;
     }
 
-    var latlngs = withCoords.map(function (e) { return [e.latitude, e.longitude]; });
-    // Route line
-    L.polyline(latlngs, { color: '#ff6b00', weight: 4, opacity: 0.85 }).addTo(mapLayer);
-    L.polyline(latlngs, { color: '#fff', weight: 1.2, opacity: 0.9, dashArray: '4,8' }).addTo(mapLayer);
+    var path = withCoords.map(function (e) { return { lat: e.latitude, lng: e.longitude }; });
+    mapPolylines.push(new google.maps.Polyline({
+      path: path, map: map, strokeColor: '#FD5523', strokeOpacity: 0.9, strokeWeight: 4,
+    }));
+    mapPolylines.push(new google.maps.Polyline({
+      path: path, map: map, strokeColor: '#ffffff', strokeOpacity: 0, strokeWeight: 2,
+      icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 0.9, scale: 2 }, offset: '0', repeat: '14px' }],
+    }));
 
     withCoords.forEach(function (e, i) {
       var isLast = i === withCoords.length - 1;
-      var color = isLast ? '#ff6b00' : '#0d2c54';
-      var size = isLast ? 24 : 14;
-      var icon = L.divIcon({
-        className: '',
-        html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + color + ';border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)' + (isLast ? ';animation:pulse-dot 1.6s infinite' : '') + '"></div>',
-        iconSize: [size, size], iconAnchor: [size/2, size/2]
+      var marker = new google.maps.Marker({
+        position: { lat: e.latitude, lng: e.longitude }, map: map,
+        icon: dotMarker(isLast ? '#FD5523' : '#232526', isLast ? 32 : 20, isLast),
+        zIndex: isLast ? 999 : 10,
+        title: e.label,
       });
-      L.marker([e.latitude, e.longitude], { icon: icon }).addTo(mapLayer)
-        .bindPopup('<strong>' + esc(e.label) + '</strong><br>' + esc(e.location || '') + '<br><small>' + esc(fmt(e.event_time)) + '</small>');
+      marker.addListener('click', function () {
+        infoWindow.setContent(
+          '<div class="map-popup"><strong>' + esc(e.label) + '</strong><br>' +
+          esc(e.location || '') + '<br><small>' + esc(fmt(e.event_time)) + '</small></div>'
+        );
+        infoWindow.open(map, marker);
+      });
+      mapMarkers.push(marker);
     });
 
-    if (latlngs.length === 1) { map.setView(latlngs[0], 7); }
-    else { map.fitBounds(L.latLngBounds(latlngs).pad(0.25)); }
+    if (path.length === 1) { map.setCenter(path[0]); map.setZoom(7); }
+    else {
+      var bounds = new google.maps.LatLngBounds();
+      path.forEach(function(p){ bounds.extend(p); });
+      map.fitBounds(bounds, 60);
+    }
   }
 
   function render(d) {
@@ -371,8 +416,11 @@
         '</div>' +
       '</div>';
 
-    if (changed) { map = null; mapLayer = null; }
-    setTimeout(function(){ renderMap(stages); }, 0);
+    if (changed) { map = null; clearMapOverlays(); }
+    setTimeout(function(){
+      if (typeof google !== 'undefined' && google.maps) { renderMap(stages); }
+      else { window.__gmapsReady.then(function(){ renderMap(stages); }); }
+    }, 0);
   }
 
   function setStatus(html) {
@@ -428,7 +476,7 @@
     var v = document.getElementById('trackInput').value.trim();
     if (!v) return;
     history.replaceState(null, '', 'track.html?id=' + encodeURIComponent(v));
-    lastSig = ''; map = null; mapLayer = null;
+    lastSig = ''; map = null; clearMapOverlays();
     document.getElementById('result').innerHTML = '';
     lookup(v); startPoll(v);
   });
