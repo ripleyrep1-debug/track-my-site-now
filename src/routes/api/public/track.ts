@@ -7,13 +7,6 @@ const cors = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
-type LookupResult = {
-  found?: boolean;
-  error?: string;
-  shipment?: Record<string, unknown>;
-  events?: unknown[];
-};
-
 export const Route = createFileRoute("/api/public/track")({
   server: {
     handlers: {
