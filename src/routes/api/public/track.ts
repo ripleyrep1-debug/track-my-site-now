@@ -26,7 +26,7 @@ export const Route = createFileRoute("/api/public/track")({
           return Response.json({ error: "Lookup failed" }, { status: 500, headers: cors });
         }
         if (!shipment) {
-          return Response.json({ found: false }, { status: 404, headers: cors });
+          return Response.json({ found: false }, { headers: cors });
         }
         const { data: events } = await supabaseAdmin
           .from("shipment_events")

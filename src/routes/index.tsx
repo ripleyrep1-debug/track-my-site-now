@@ -11,7 +11,7 @@ function Index() {
   }, []);
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", fontFamily: "system-ui" }}>
-      <p>Loading Logiport…</p>
+      <p>Loading Rapidexpresscargo…</p>
     </div>
   );
 }

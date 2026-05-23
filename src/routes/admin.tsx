@@ -57,7 +57,7 @@ function AdminPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [form, setForm] = useState({
     tracking_number: "", customer_name: "", customer_email: "",
-    origin: "", destination: "", carrier: "Logiport Express",
+    origin: "", destination: "", carrier: "Rapidexpresscargo Express",
     status: "Order received", eta: "", service: "", weight: "", notes: "",
   });
   const [formError, setFormError] = useState<string | null>(null);
