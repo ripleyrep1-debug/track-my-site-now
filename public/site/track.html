@@ -304,7 +304,15 @@
     if (!mapHost) return;
     pendingMapEvents = events;
 
+    var timedOut = false;
+    var timeoutId = setTimeout(function () {
+      timedOut = true;
+      showMapError("The live map is taking longer than usual to load.");
+    }, 10000);
+
     loadGoogleMaps().then(function (gmaps) {
+      clearTimeout(timeoutId);
+      if (timedOut) return;
       var evs = pendingMapEvents || events;
       var withCoords = evs.filter(function (e) { return e.latitude != null && e.longitude != null; });
       var defaultCenter = { lat: 50.1109, lng: 8.6821 }; // Frankfurt
