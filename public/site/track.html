@@ -397,12 +397,11 @@
       '</div>';
 
     // We only get here on a real change, so the #map node was just re-created. Reset and rebuild.
+    if (map) { try { map.remove(); } catch(e){} }
     map = null;
-    clearMapOverlays();
-    setTimeout(function(){
-      if (typeof google !== 'undefined' && google.maps) { renderMap(stages); }
-      else { window.__gmapsReady.then(function(){ renderMap(stages); }); }
-    }, 0);
+    mapMarkers = [];
+    mapPolylines = [];
+    setTimeout(function(){ renderMap(stages); }, 0);
   }
 
 
