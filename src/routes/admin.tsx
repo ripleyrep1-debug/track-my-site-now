@@ -59,6 +59,10 @@ function AdminPage() {
     tracking_number: "", customer_name: "", customer_email: "",
     origin: "", destination: "", carrier: "Rapidexpresscargo Express",
     status: "Order received", eta: "", service: "", weight: "", notes: "",
+    origin_warehouse: "" as "" | "Greece" | "Poland" | "Germany",
+    transit_days: 5,
+    auto_progress: true,
+    ship_started_at: "",
   });
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -66,8 +70,14 @@ function AdminPage() {
     e.preventDefault();
     setFormError(null);
     try {
-      await createFn({ data: form });
-      setForm({ ...form, tracking_number: "", customer_name: "", customer_email: "", origin: "", destination: "", eta: "", notes: "" });
+      const payload = {
+        ...form,
+        origin_warehouse: form.origin_warehouse || null,
+        transit_days: form.auto_progress ? form.transit_days : null,
+        ship_started_at: form.ship_started_at || null,
+      };
+      await createFn({ data: payload });
+      setForm({ ...form, tracking_number: "", customer_name: "", customer_email: "", origin: "", destination: "", eta: "", notes: "", ship_started_at: "" });
       qc.invalidateQueries({ queryKey: ["shipments"] });
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed");
@@ -170,6 +180,39 @@ function AdminPage() {
             <Field label="ETA" type="datetime-local" value={form.eta} onChange={(v) => setForm({ ...form, eta: v })} />
             <Field label="Service" value={form.service} onChange={(v) => setForm({ ...form, service: v })} placeholder="Ocean freight" />
             <Field label="Weight" value={form.weight} onChange={(v) => setForm({ ...form, weight: v })} placeholder="12 kg" />
+
+            <div className="mt-3 pt-3 border-t space-y-2">
+              <p className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Auto tracking</p>
+              <label className="flex items-center gap-2 text-xs text-slate-700">
+                <input type="checkbox" checked={form.auto_progress}
+                  onChange={(e) => setForm({ ...form, auto_progress: e.target.checked })} />
+                Automatically progress timeline events
+              </label>
+              <label className="block">
+                <span className="text-xs text-slate-600">Origin warehouse</span>
+                <select value={form.origin_warehouse}
+                  onChange={(e) => setForm({ ...form, origin_warehouse: e.target.value as typeof form.origin_warehouse })}
+                  className="w-full border rounded px-2 py-1.5 mt-0.5 bg-white">
+                  <option value="">— None (manual) —</option>
+                  <option value="Greece">Greece (Athens)</option>
+                  <option value="Poland">Poland (Warsaw)</option>
+                  <option value="Germany">Germany (Frankfurt)</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs text-slate-600">Transit time (days)</span>
+                <select value={form.transit_days}
+                  disabled={!form.auto_progress}
+                  onChange={(e) => setForm({ ...form, transit_days: parseInt(e.target.value, 10) })}
+                  className="w-full border rounded px-2 py-1.5 mt-0.5 bg-white disabled:opacity-50">
+                  {[3,4,5,6,7].map((d) => <option key={d} value={d}>{d} days</option>)}
+                </select>
+              </label>
+              <Field label="Ship start (optional, defaults to now)" type="datetime-local"
+                value={form.ship_started_at} onChange={(v) => setForm({ ...form, ship_started_at: v })} />
+              <p className="text-[11px] text-slate-500">When enabled, events from "Order received" → "Delivered" are inserted automatically over the chosen window. Updates run every 15 minutes.</p>
+            </div>
+
             {formError && <p className="text-red-600 text-xs">{formError}</p>}
             <button className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2 rounded font-medium">Create</button>
           </form>

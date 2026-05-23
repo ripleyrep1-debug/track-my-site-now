@@ -100,6 +100,10 @@ const ShipmentInput = z.object({
   weight: z.string().max(50).optional().nullable(),
   service: z.string().max(100).optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
+  origin_warehouse: z.enum(["Greece", "Poland", "Germany"]).optional().nullable(),
+  transit_days: z.number().int().min(3).max(7).optional().nullable(),
+  auto_progress: z.boolean().optional().default(false),
+  ship_started_at: z.string().optional().nullable().or(z.literal("")),
 });
 
 export const createShipment = createServerFn({ method: "POST" })
@@ -112,6 +116,11 @@ export const createShipment = createServerFn({ method: "POST" })
       ...data,
       customer_email: data.customer_email || null,
       eta: data.eta ? new Date(data.eta).toISOString() : null,
+      ship_started_at: data.ship_started_at
+        ? new Date(data.ship_started_at).toISOString()
+        : data.auto_progress
+          ? new Date().toISOString()
+          : null,
     };
     const { data: row, error } = await supabase.from("shipments").insert(payload).select().single();
     if (error) {
@@ -133,6 +142,10 @@ export const updateShipment = createServerFn({ method: "POST" })
     const patch = { ...data.patch } as Record<string, unknown>;
     if ("eta" in patch) patch.eta = patch.eta ? new Date(patch.eta as string).toISOString() : null;
     if ("customer_email" in patch && !patch.customer_email) patch.customer_email = null;
+    if ("ship_started_at" in patch)
+      patch.ship_started_at = patch.ship_started_at
+        ? new Date(patch.ship_started_at as string).toISOString()
+        : null;
     const { error } = await supabase.from("shipments").update(patch as never).eq("id", data.id);
     if (error) fail("updateShipment", error, "Could not update shipment");
     return { ok: true };
