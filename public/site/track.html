@@ -8,68 +8,185 @@
 <link href="assets/css/bootstrap.min.css" rel="stylesheet">
 <link href="assets/css/style.css" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-  body { color: #1a2238; }
-  .track-hero { background: linear-gradient(135deg,#0d2c54,#163a6e); color: #fff; padding: 110px 0 50px; }
-  .track-hero .lead { color: #fff; opacity: 1; font-weight: 400; }
-  .track-form .form-control { height: 56px; font-size: 16px; color: #1a2238; }
-  .track-form .form-control::placeholder { color: #6b7280; }
-  .text-muted { color: #5a6478 !important; }
-  .label-eyebrow { color: #6b7280; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; }
-  .field-value { color: #0d2c54; font-weight: 600; font-size: 15px; }
-  .tracking-id { color: #0d2c54; font-weight: 800; letter-spacing: .02em; }
-  .recipient { color: #374151; font-size: 14px; font-weight: 500; }
-  .timeline { position: relative; padding-left: 32px; }
-  .timeline:before { content: ''; position: absolute; left: 11px; top: 8px; bottom: 8px; width: 2px; background: #e3e6ef; }
-  .timeline .item { position: relative; padding-bottom: 22px; }
-  .timeline .item:before { content: ''; position: absolute; left: -28px; top: 4px; width: 16px; height: 16px; border-radius: 50%; background: #e3e6ef; border: 3px solid #fff; box-shadow: 0 0 0 1px #e3e6ef; }
-  .timeline .item.done:before { background: #ff6b00; box-shadow: 0 0 0 1px #ff6b00; }
-  .timeline .item.current:before { background: #ff6b00; animation: pulse 1.5s infinite; }
-  .timeline .item .tl-label { color: #0d2c54; font-weight: 700; font-size: 15px; }
-  .timeline .item .tl-loc { color: #4b5563; font-size: 13px; font-weight: 500; }
-  .timeline .item .tl-time { color: #4b5563; font-size: 13px; font-weight: 500; white-space: nowrap; }
-  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(255,107,0,.5)} 70%{box-shadow:0 0 0 12px rgba(255,107,0,0)} 100%{box-shadow:0 0 0 0 rgba(255,107,0,0)} }
-  .status-pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; font-weight: 700; font-size: 14px; }
-  .status-pill .dot { width: 8px; height: 8px; border-radius: 50%; }
-  .status-default { background:#fff3e8; color:#c75300; } .status-default .dot { background:#ff6b00; }
-  .status-delivered { background:#e6f7ec; color:#1b7a3e; } .status-delivered .dot { background:#1b7a3e; }
-  .status-hold { background:#fff8d9; color:#8a6d00; } .status-hold .dot { background:#e0b500; }
-  .status-issue { background:#fde7e7; color:#a31b1b; } .status-issue .dot { background:#d32f2f; }
-  #map { height: 420px; border-radius: 10px; background:#eef1f6; }
+  :root {
+    --brand-orange: #ff6b00;
+    --brand-orange-dark: #e85d00;
+    --brand-orange-soft: #fff3e8;
+    --brand-navy: #0d2c54;
+    --brand-navy-dark: #081f3d;
+    --ink: #1a2238;
+    --ink-soft: #4b5563;
+    --ink-muted: #6b7280;
+    --line: #eef1f6;
+    --line-strong: #e3e6ef;
+    --bg-soft: #f7f9fc;
+  }
+  body { color: var(--ink); font-family: 'Inter', -apple-system, sans-serif; background: var(--bg-soft); }
+
+  /* Hero */
+  .track-hero {
+    background:
+      radial-gradient(1200px 400px at 80% -10%, rgba(255,107,0,.25), transparent 60%),
+      linear-gradient(135deg, var(--brand-navy-dark) 0%, var(--brand-navy) 60%, #163a6e 100%);
+    color: #fff; padding: 90px 0 140px; position: relative; overflow: hidden;
+  }
+  .track-hero::after {
+    content: ''; position: absolute; inset: auto 0 -1px 0; height: 80px;
+    background: linear-gradient(to bottom, transparent, var(--bg-soft));
+  }
+  .track-hero .eyebrow { color: var(--brand-orange); font-weight: 700; font-size: 13px; letter-spacing: .18em; text-transform: uppercase; }
+  .track-hero h1 { font-weight: 800; letter-spacing: -.02em; }
+  .track-hero .lead { color: rgba(255,255,255,.85); font-weight: 400; }
+  .track-form { background: #fff; padding: 8px; border-radius: 14px; box-shadow: 0 20px 60px -20px rgba(0,0,0,.4); max-width: 720px; position: relative; z-index: 2; }
+  .track-form .form-control { height: 56px; font-size: 16px; color: var(--ink); border: 0; font-weight: 500; }
+  .track-form .form-control::placeholder { color: var(--ink-muted); }
+  .btn-brand { background: var(--brand-orange); border-color: var(--brand-orange); color: #fff; font-weight: 700; border-radius: 10px; height: 56px; transition: all .2s; }
+  .btn-brand:hover { background: var(--brand-orange-dark); border-color: var(--brand-orange-dark); color: #fff; transform: translateY(-1px); box-shadow: 0 10px 25px -10px rgba(255,107,0,.6); }
+
+  /* Layout container that pulls cards up over the hero */
+  .results-wrap { margin-top: -90px; position: relative; z-index: 3; }
+
+  .card-premium {
+    background: #fff; border-radius: 16px; border: 1px solid var(--line);
+    box-shadow: 0 4px 24px -8px rgba(13, 44, 84, 0.08);
+  }
+  .card-premium .card-pad { padding: 28px; }
+  @media (min-width: 768px) { .card-premium .card-pad { padding: 36px; } }
+
+  /* Header strip */
+  .label-eyebrow { color: var(--ink-muted); font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 6px; }
+  .field-value { color: var(--brand-navy); font-weight: 600; font-size: 15px; }
+  .tracking-id { color: var(--brand-navy); font-weight: 800; letter-spacing: .01em; font-size: 28px; line-height: 1.1; }
+  .recipient { color: var(--ink-soft); font-size: 14px; font-weight: 500; }
+  .recipient i { color: var(--brand-orange); }
+
+  /* Status pill (always orange + pulsing dot per request) */
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 10px 18px; border-radius: 999px; font-weight: 700; font-size: 14px;
+    background: var(--brand-orange-soft); color: var(--brand-orange-dark);
+    border: 1px solid rgba(255,107,0,.25);
+  }
+  .status-pill .dot {
+    width: 10px; height: 10px; border-radius: 50%; background: var(--brand-orange);
+    box-shadow: 0 0 0 0 rgba(255,107,0,.55); animation: pulse-dot 1.6s infinite;
+  }
+  @keyframes pulse-dot { 0%{box-shadow:0 0 0 0 rgba(255,107,0,.55)} 70%{box-shadow:0 0 0 14px rgba(255,107,0,0)} 100%{box-shadow:0 0 0 0 rgba(255,107,0,0)} }
   .live-indicator { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#1b7a3e; font-weight:700; }
-  .live-indicator .live-dot { width:8px; height:8px; border-radius:50%; background:#1b7a3e; animation:pulse 1.5s infinite; }
-  .leaflet-popup-content { margin: 8px 12px; color:#1a2238; }
-  .progress-track { height: 8px; background: #eef1f6; border-radius: 999px; overflow: hidden; margin: 16px 0 6px; }
-  .progress-track .bar { height: 100%; background: linear-gradient(90deg,#ff6b00,#ff9248); border-radius: 999px; transition: width .6s ease; }
-  .progress-meta { display:flex; justify-content: space-between; font-size: 12px; color:#5a6478; font-weight: 600; }
-  .summary-card { border:1px solid #eef1f6; }
-  .timeline-card h5 { color: #0d2c54; font-weight: 700; }
+  .live-indicator .live-dot { width:8px; height:8px; border-radius:50%; background:#1b7a3e; animation:pulse-green 1.5s infinite; }
+  @keyframes pulse-green { 0%{box-shadow:0 0 0 0 rgba(27,122,62,.55)} 70%{box-shadow:0 0 0 10px rgba(27,122,62,0)} 100%{box-shadow:0 0 0 0 rgba(27,122,62,0)} }
+
+  /* Horizontal progress timeline with icons */
+  .progress-rail { position: relative; padding: 18px 0 0; }
+  .progress-rail .track-line { position: absolute; left: 24px; right: 24px; top: 44px; height: 4px; background: var(--line-strong); border-radius: 999px; overflow: hidden; }
+  .progress-rail .track-fill { height: 100%; background: linear-gradient(90deg, var(--brand-orange), #ff9248); border-radius: 999px; transition: width .8s cubic-bezier(.22,1,.36,1); }
+  .progress-rail .steps { display: grid; grid-template-columns: repeat(6, 1fr); position: relative; z-index: 2; gap: 8px; }
+  .progress-rail .step { text-align: center; }
+  .progress-rail .step .ico {
+    width: 52px; height: 52px; margin: 0 auto 10px; border-radius: 50%;
+    background: #fff; border: 3px solid var(--line-strong); color: var(--ink-muted);
+    display: flex; align-items: center; justify-content: center; font-size: 22px;
+    transition: all .35s ease;
+  }
+  .progress-rail .step.done .ico { background: var(--brand-orange); border-color: var(--brand-orange); color: #fff; box-shadow: 0 8px 18px -6px rgba(255,107,0,.5); }
+  .progress-rail .step.current .ico {
+    background: #fff; border-color: var(--brand-orange); color: var(--brand-orange);
+    animation: pulse-ring 1.8s infinite;
+  }
+  @keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(255,107,0,.5)} 70%{box-shadow:0 0 0 14px rgba(255,107,0,0)} 100%{box-shadow:0 0 0 0 rgba(255,107,0,0)} }
+  .progress-rail .step .label { font-size: 12px; font-weight: 700; color: var(--ink-soft); line-height: 1.3; }
+  .progress-rail .step.done .label, .progress-rail .step.current .label { color: var(--brand-navy); }
+  @media (max-width: 767px) {
+    .progress-rail .steps { grid-template-columns: repeat(3, 1fr); row-gap: 22px; }
+    .progress-rail .track-line { display: none; }
+  }
+
+  /* Details grid */
+  .detail-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px 32px; }
+  @media (max-width: 767px) { .detail-row { grid-template-columns: repeat(2, 1fr); gap: 18px 20px; } }
+  .detail-row .item { border-left: 3px solid var(--brand-orange-soft); padding-left: 14px; }
+  .detail-row .item.alt { border-left-color: var(--brand-navy); }
+
+  /* Map */
+  .map-card { padding: 0; overflow: hidden; }
+  .map-head {
+    display: flex; align-items: center; justify-content: space-between; padding: 18px 24px;
+    border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fff, #fafbfd);
+  }
+  .map-head .title { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--brand-navy); }
+  .map-head .title i { color: var(--brand-orange); font-size: 20px; }
+  .map-head .legend { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+  .map-head .legend .lg { display: inline-flex; align-items: center; gap: 6px; }
+  .map-head .legend .lg .swatch { width: 10px; height: 10px; border-radius: 50%; }
+  #map { height: 520px; background: #eef1f6; }
+  .leaflet-popup-content { margin: 10px 14px; color: var(--ink); font-family: 'Inter', sans-serif; }
+  .leaflet-popup-content-wrapper { border-radius: 10px; }
+
+  /* Activity log */
+  .activity-card .head { padding: 22px 24px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; }
+  .activity-card .head h5 { font-weight: 800; color: var(--brand-navy); margin: 0; font-size: 17px; }
+  .activity-card .head .count { font-size: 12px; color: var(--ink-muted); font-weight: 600; }
+  .activity-list { padding: 8px 24px 24px; max-height: 540px; overflow-y: auto; }
+  .activity-list::-webkit-scrollbar { width: 6px; }
+  .activity-list::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 3px; }
+  .activity-item { position: relative; padding: 18px 0 18px 36px; border-bottom: 1px dashed var(--line); }
+  .activity-item:last-child { border-bottom: 0; }
+  .activity-item::before {
+    content: ''; position: absolute; left: 8px; top: 24px;
+    width: 12px; height: 12px; border-radius: 50%; background: var(--line-strong); border: 2px solid #fff; box-shadow: 0 0 0 2px var(--line-strong);
+  }
+  .activity-item::after {
+    content: ''; position: absolute; left: 13px; top: 36px; bottom: -18px; width: 2px; background: var(--line-strong);
+  }
+  .activity-item:last-child::after { display: none; }
+  .activity-item.done::before { background: var(--brand-orange); box-shadow: 0 0 0 2px var(--brand-orange); }
+  .activity-item.current::before { background: var(--brand-orange); box-shadow: 0 0 0 4px rgba(255,107,0,.25); animation: pulse-dot 1.6s infinite; }
+  .activity-item .a-label { color: var(--brand-navy); font-weight: 700; font-size: 14px; }
+  .activity-item .a-loc { color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
+  .activity-item .a-time { color: var(--ink-muted); font-size: 12px; margin-top: 4px; font-weight: 500; }
+
+  /* Trust footer */
+  .trust-row { display: flex; flex-wrap: wrap; gap: 14px 28px; padding: 18px 24px; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: 13px; }
+  .trust-row .ti { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+  .trust-row .ti i { color: var(--brand-orange); }
+
+  /* Map placeholder when no coords */
+  .map-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; height: 100%; color: var(--ink-muted); text-align: center; padding: 30px; }
+  .map-placeholder i { font-size: 42px; color: var(--brand-orange); }
 </style>
 </head>
 <body>
 
 <div class="track-hero">
   <div class="container">
-    <a href="index.html" class="text-white text-decoration-none small"><i class="bi bi-arrow-left"></i> Back to home</a>
-    <h1 class="display-5 fw-bold mt-3">Track your shipment</h1>
-    <p class="lead opacity-75 mb-4">Live tracking — see exactly where your package is, right now.</p>
-    <form id="trackForm" class="row g-2 track-form bg-white p-2 rounded shadow-sm" style="max-width: 720px;">
+    <a href="index.html" class="text-white text-decoration-none small opacity-75"><i class="bi bi-arrow-left"></i> Back to home</a>
+    <div class="eyebrow mt-3">Real-time tracking</div>
+    <h1 class="display-5 mt-2 mb-2">Track your shipment</h1>
+    <p class="lead mb-4">Live updates, route history, and delivery ETA — refreshed automatically every 20 seconds.</p>
+    <form id="trackForm" class="row g-2 track-form">
       <div class="col-md-8">
-        <input id="trackInput" type="text" required class="form-control border-0" placeholder="Enter tracking number" />
+        <input id="trackInput" type="text" required class="form-control" placeholder="Enter tracking number (e.g. LGP-DEMO-001)" />
       </div>
       <div class="col-md-4">
-        <button type="submit" class="btn btn-primary w-100 h-100">Track Now</button>
+        <button type="submit" class="btn btn-brand w-100">Track Now <i class="bi bi-arrow-right ms-1"></i></button>
       </div>
     </form>
   </div>
 </div>
 
-<div class="container py-5">
+<div class="container results-wrap pb-5">
   <div id="status" class="text-center py-3" style="display:none;"></div>
   <div id="result"></div>
-  <div id="empty" class="text-center py-5 text-muted" style="display:none;">
-    <i class="bi bi-box-seam" style="font-size: 48px;"></i>
-    <p class="mt-3">Enter a tracking number above to view your shipment status.</p>
+  <div id="empty" class="card-premium" style="display:none;">
+    <div class="card-pad text-center py-5">
+      <i class="bi bi-box-seam" style="font-size: 56px; color: var(--brand-orange);"></i>
+      <h4 class="fw-bold mt-3 mb-1" style="color: var(--brand-navy);">Enter a tracking number</h4>
+      <p class="text-muted mb-0">Try the sample <a href="?id=LGP-DEMO-001" style="color: var(--brand-orange); font-weight: 600;">LGP-DEMO-001</a> to see a live demo.</p>
+    </div>
   </div>
 </div>
 
@@ -83,28 +200,57 @@
   var mapLayer = null;
   var lastSig = '';
 
+  // Canonical 6-step shipment journey with icons
+  var JOURNEY = [
+    { key: 'order',    label: 'Order received', icon: 'bi-clipboard-check', match: ['order','received','booked'] },
+    { key: 'pickup',   label: 'Picked up',      icon: 'bi-box-seam',        match: ['picked','pickup'] },
+    { key: 'warehouse',label: 'At warehouse',   icon: 'bi-building',        match: ['warehouse','left the warehouse'] },
+    { key: 'transit',  label: 'In transit',     icon: 'bi-truck',           match: ['transit','port','customs','arrived'] },
+    { key: 'out',      label: 'Out for delivery', icon: 'bi-bicycle',       match: ['out for','out-for'] },
+    { key: 'delivered',label: 'Delivered',      icon: 'bi-house-check',     match: ['deliver'] },
+  ];
+
   function getParam(n) { return new URLSearchParams(window.location.search).get(n); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' })[c]; }); }
-  function fmt(t) { if (!t) return ''; try { return new Date(t).toLocaleString(); } catch(e) { return t; } }
+  function fmt(t) { if (!t) return ''; try { return new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); } catch(e) { return t; } }
 
-  function statusClass(s) {
-    s = (s || '').toLowerCase();
-    if (s.indexOf('deliver') === 0) return 'status-delivered';
-    if (s.indexOf('hold') !== -1) return 'status-hold';
-    if (s.indexOf('fail') !== -1 || s.indexOf('return') !== -1) return 'status-issue';
-    return 'status-default';
+  function stageIndex(status) {
+    var s = (status || '').toLowerCase();
+    if (s.indexOf('hold') !== -1 || s.indexOf('fail') !== -1 || s.indexOf('return') !== -1) return 3; // treat as transit-stuck
+    for (var i = JOURNEY.length - 1; i >= 0; i--) {
+      for (var j = 0; j < JOURNEY[i].match.length; j++) {
+        if (s.indexOf(JOURNEY[i].match[j]) !== -1) return i;
+      }
+    }
+    return 0;
   }
 
-  function renderMap(events, shipment) {
+  function renderJourney(currentIdx) {
+    var pct = currentIdx <= 0 ? 6 : (currentIdx / (JOURNEY.length - 1)) * 100;
+    var steps = JOURNEY.map(function (s, i) {
+      var cls = i < currentIdx ? 'done' : (i === currentIdx ? 'done current' : '');
+      return '<div class="step ' + cls + '">' +
+        '<div class="ico"><i class="bi ' + s.icon + '"></i></div>' +
+        '<div class="label">' + esc(s.label) + '</div>' +
+      '</div>';
+    }).join('');
+    return '<div class="progress-rail">' +
+      '<div class="track-line"><div class="track-fill" style="width:' + pct + '%"></div></div>' +
+      '<div class="steps">' + steps + '</div>' +
+    '</div>';
+  }
+
+  function renderMap(events) {
     var withCoords = events.filter(function (e) { return e.latitude != null && e.longitude != null; });
     var mapHost = document.getElementById('map');
     if (!mapHost) return;
-    if (!withCoords.length) {
-      mapHost.innerHTML = '<div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted bg-light rounded"><i class="bi bi-geo-alt" style="font-size:36px"></i><p class="mt-2 mb-0 small">Location updates will appear here as your package moves.</p></div>';
-      return;
-    }
+
+    // Default fallback: Frankfurt, Germany (major European logistics hub)
+    var defaultCenter = [50.1109, 8.6821];
+
     if (!map) {
-      map = L.map('map', { scrollWheelZoom: false }).setView([withCoords[0].latitude, withCoords[0].longitude], 4);
+      map = L.map('map', { scrollWheelZoom: false, zoomControl: true })
+        .setView(withCoords.length ? [withCoords[0].latitude, withCoords[0].longitude] : defaultCenter, withCoords.length ? 4 : 6);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19, attribution: '&copy; OpenStreetMap'
       }).addTo(map);
@@ -112,97 +258,121 @@
     if (mapLayer) { map.removeLayer(mapLayer); }
     mapLayer = L.layerGroup().addTo(map);
 
+    if (!withCoords.length) {
+      // Place a soft hub marker on Frankfurt as a contextual placeholder
+      var hubIcon = L.divIcon({
+        className: '',
+        html: '<div style="width:18px;height:18px;border-radius:50%;background:#0d2c54;border:3px solid #fff;box-shadow:0 0 0 2px rgba(13,44,84,.25)"></div>',
+        iconSize: [18, 18], iconAnchor: [9, 9]
+      });
+      L.marker(defaultCenter, { icon: hubIcon }).addTo(mapLayer)
+        .bindPopup('<strong>Frankfurt Hub</strong><br><small>Awaiting first scan…</small>');
+      map.setView(defaultCenter, 6);
+      return;
+    }
+
     var latlngs = withCoords.map(function (e) { return [e.latitude, e.longitude]; });
-    L.polyline(latlngs, { color: '#ff6b00', weight: 3, opacity: 0.7, dashArray: '6,8' }).addTo(mapLayer);
+    // Route line
+    L.polyline(latlngs, { color: '#ff6b00', weight: 4, opacity: 0.85 }).addTo(mapLayer);
+    L.polyline(latlngs, { color: '#fff', weight: 1.2, opacity: 0.9, dashArray: '4,8' }).addTo(mapLayer);
 
     withCoords.forEach(function (e, i) {
       var isLast = i === withCoords.length - 1;
+      var color = isLast ? '#ff6b00' : '#0d2c54';
+      var size = isLast ? 24 : 14;
       var icon = L.divIcon({
         className: '',
-        html: '<div style="width:' + (isLast?22:14) + 'px;height:' + (isLast?22:14) + 'px;border-radius:50%;background:' + (isLast?'#ff6b00':'#0d2c54') + ';border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)' + (isLast?';animation:pulse 1.5s infinite':'') + '"></div>',
-        iconSize: [isLast?22:14, isLast?22:14],
-        iconAnchor: [isLast?11:7, isLast?11:7]
+        html: '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + color + ';border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)' + (isLast ? ';animation:pulse-dot 1.6s infinite' : '') + '"></div>',
+        iconSize: [size, size], iconAnchor: [size/2, size/2]
       });
       L.marker([e.latitude, e.longitude], { icon: icon }).addTo(mapLayer)
         .bindPopup('<strong>' + esc(e.label) + '</strong><br>' + esc(e.location || '') + '<br><small>' + esc(fmt(e.event_time)) + '</small>');
     });
 
-    if (latlngs.length === 1) { map.setView(latlngs[0], 6); }
+    if (latlngs.length === 1) { map.setView(latlngs[0], 7); }
     else { map.fitBounds(L.latLngBounds(latlngs).pad(0.25)); }
   }
 
   function render(d) {
     var stages = (d.events || []).slice().sort(function(a,b){ return (a.sequence||0)-(b.sequence||0) || new Date(a.event_time)-new Date(b.event_time); });
     var lastIdx = stages.length - 1;
-    var rows = stages.map(function (s, i) {
-      var current = i === lastIdx;
-      return '<div class="item done ' + (current ? 'current' : '') + '">' +
-        '<div class="d-flex justify-content-between flex-wrap gap-2">' +
-          '<div><div class="tl-label">' + esc(s.label) + '</div>' +
-          '<div class="tl-loc">' + esc(s.location || '') + '</div></div>' +
-          '<div class="tl-time">' + esc(fmt(s.event_time)) + '</div>' +
-        '</div></div>';
+    var currentStage = stageIndex(d.shipment.status);
+
+    // Activity log items (reverse chronological)
+    var activityRows = stages.slice().reverse().map(function (s, i) {
+      var current = i === 0;
+      return '<div class="activity-item ' + (current ? 'current' : 'done') + '">' +
+        '<div class="a-label">' + esc(s.label) + '</div>' +
+        (s.location ? '<div class="a-loc"><i class="bi bi-geo-alt"></i> ' + esc(s.location) + '</div>' : '') +
+        '<div class="a-time"><i class="bi bi-clock"></i> ' + esc(fmt(s.event_time)) + '</div>' +
+      '</div>';
     }).join('');
 
-    // Progress percentage based on status keywords
-    var statusLower = (d.shipment.status || '').toLowerCase();
-    var pct = 10;
-    if (statusLower.indexOf('order') === 0) pct = 10;
-    else if (statusLower.indexOf('picked') !== -1) pct = 20;
-    else if (statusLower.indexOf('warehouse') !== -1) pct = 30;
-    else if (statusLower.indexOf('transit') !== -1) pct = 55;
-    else if (statusLower.indexOf('port') !== -1) pct = 65;
-    else if (statusLower.indexOf('customs') !== -1) pct = 75;
-    else if (statusLower.indexOf('out for') !== -1) pct = 90;
-    else if (statusLower.indexOf('deliver') === 0) pct = 100;
-    else if (statusLower.indexOf('hold') !== -1) pct = 50;
-
-    // signature to avoid re-rendering map on identical polls
     var sig = JSON.stringify({ s: d.shipment.status, e: stages.map(function(x){return [x.label,x.event_time,x.latitude,x.longitude];}) });
     var changed = sig !== lastSig;
     lastSig = sig;
 
     document.getElementById('result').innerHTML =
-      '<div class="bg-white shadow-sm rounded summary-card p-4 p-md-5 mb-4">' +
-        '<div class="d-flex justify-content-between flex-wrap gap-3 align-items-start">' +
-          '<div>' +
-            '<div class="label-eyebrow">Tracking ID</div>' +
-            '<div class="h3 tracking-id mb-1">' + esc(d.shipment.tracking_number) + '</div>' +
-            (d.shipment.customer_name ? '<div class="recipient"><i class="bi bi-person-circle"></i> Recipient: <strong>' + esc(d.shipment.customer_name) + '</strong></div>' : '') +
+      // ── Summary card with journey timeline ──
+      '<div class="card-premium mb-4">' +
+        '<div class="card-pad">' +
+          '<div class="d-flex justify-content-between flex-wrap gap-3 align-items-start mb-4">' +
+            '<div>' +
+              '<div class="label-eyebrow">Tracking ID</div>' +
+              '<div class="tracking-id mb-2">' + esc(d.shipment.tracking_number) + '</div>' +
+              (d.shipment.customer_name ? '<div class="recipient"><i class="bi bi-person-circle"></i> Recipient: <strong>' + esc(d.shipment.customer_name) + '</strong></div>' : '') +
+            '</div>' +
+            '<div class="text-end">' +
+              '<span class="status-pill"><span class="dot"></span>' + esc(d.shipment.status) + '</span>' +
+              '<div class="live-indicator mt-2"><span class="live-dot"></span>Live · updates every 20s</div>' +
+            '</div>' +
           '</div>' +
-          '<div class="text-end">' +
-            '<span class="status-pill ' + statusClass(d.shipment.status) + '"><span class="dot"></span>' + esc(d.shipment.status) + '</span>' +
-            '<div class="live-indicator mt-2"><span class="live-dot"></span>Live · updates every 20s</div>' +
+
+          renderJourney(currentStage) +
+
+          '<hr class="my-4" style="border-color: var(--line);"/>' +
+
+          '<div class="detail-row">' +
+            '<div class="item"><div class="label-eyebrow">Origin</div><div class="field-value">' + esc(d.shipment.origin) + '</div></div>' +
+            '<div class="item alt"><div class="label-eyebrow">Destination</div><div class="field-value">' + esc(d.shipment.destination) + '</div></div>' +
+            '<div class="item"><div class="label-eyebrow">Estimated arrival</div><div class="field-value">' + esc(d.shipment.eta ? fmt(d.shipment.eta) : '—') + '</div></div>' +
+            '<div class="item alt"><div class="label-eyebrow">Carrier</div><div class="field-value">' + esc(d.shipment.carrier || '—') + '</div></div>' +
+            (d.shipment.service ? '<div class="item"><div class="label-eyebrow">Service</div><div class="field-value">' + esc(d.shipment.service) + '</div></div>' : '') +
+            (d.shipment.weight ? '<div class="item alt"><div class="label-eyebrow">Weight</div><div class="field-value">' + esc(d.shipment.weight) + '</div></div>' : '') +
           '</div>' +
         '</div>' +
-        '<div class="progress-track"><div class="bar" style="width:' + pct + '%"></div></div>' +
-        '<div class="progress-meta"><span>' + esc(d.shipment.origin) + '</span><span>' + pct + '% complete</span><span>' + esc(d.shipment.destination) + '</span></div>' +
-        '<hr class="mt-4"/>' +
-        '<div class="row g-4">' +
-          '<div class="col-6 col-md-3"><div class="label-eyebrow">Origin</div><div class="field-value">' + esc(d.shipment.origin) + '</div></div>' +
-          '<div class="col-6 col-md-3"><div class="label-eyebrow">Destination</div><div class="field-value">' + esc(d.shipment.destination) + '</div></div>' +
-          '<div class="col-6 col-md-3"><div class="label-eyebrow">Estimated arrival</div><div class="field-value">' + esc(d.shipment.eta ? fmt(d.shipment.eta) : '—') + '</div></div>' +
-          '<div class="col-6 col-md-3"><div class="label-eyebrow">Carrier</div><div class="field-value">' + esc(d.shipment.carrier) + '</div></div>' +
-          (d.shipment.service ? '<div class="col-6 col-md-3"><div class="label-eyebrow">Service</div><div class="field-value">' + esc(d.shipment.service) + '</div></div>' : '') +
-          (d.shipment.weight ? '<div class="col-6 col-md-3"><div class="label-eyebrow">Weight</div><div class="field-value">' + esc(d.shipment.weight) + '</div></div>' : '') +
+        '<div class="trust-row">' +
+          '<span class="ti"><i class="bi bi-shield-check"></i> Secure tracking</span>' +
+          '<span class="ti"><i class="bi bi-broadcast-pin"></i> Live GPS updates</span>' +
+          '<span class="ti"><i class="bi bi-headset"></i> 24/7 support</span>' +
+          '<span class="ti"><i class="bi bi-patch-check"></i> Verified carrier</span>' +
         '</div>' +
       '</div>' +
 
+      // ── Map + Activity Log ──
       '<div class="row g-4">' +
-        '<div class="col-lg-7">' +
-          '<div class="bg-white shadow-sm rounded p-3 summary-card"><div id="map"></div></div>' +
+        '<div class="col-lg-8">' +
+          '<div class="card-premium map-card">' +
+            '<div class="map-head">' +
+              '<div class="title"><i class="bi bi-geo-alt-fill"></i> Live route map</div>' +
+              '<div class="legend">' +
+                '<span class="lg"><span class="swatch" style="background:#0d2c54"></span> Past scan</span>' +
+                '<span class="lg"><span class="swatch" style="background:#ff6b00"></span> Current location</span>' +
+              '</div>' +
+            '</div>' +
+            '<div id="map"></div>' +
+          '</div>' +
         '</div>' +
-        '<div class="col-lg-5">' +
-          '<div class="bg-white shadow-sm rounded summary-card timeline-card p-4 h-100">' +
-            '<h5 class="fw-bold mb-3">Shipment timeline</h5>' +
-            (stages.length ? '<div class="timeline">' + rows + '</div>' : '<p class="text-muted small mb-0">No events logged yet. Check back soon.</p>') +
+        '<div class="col-lg-4">' +
+          '<div class="card-premium activity-card h-100">' +
+            '<div class="head"><h5>Activity log</h5><span class="count">' + stages.length + ' events</span></div>' +
+            (stages.length ? '<div class="activity-list">' + activityRows + '</div>' : '<div class="activity-list"><p class="text-muted small mb-0 py-3">No events logged yet. Check back soon — updates appear here in real time.</p></div>') +
           '</div>' +
         '</div>' +
       '</div>';
 
-    // map needs DOM mount, then init/refresh
     if (changed) { map = null; mapLayer = null; }
-    setTimeout(function(){ renderMap(stages, d.shipment); }, 0);
+    setTimeout(function(){ renderMap(stages); }, 0);
   }
 
   function setStatus(html) {
@@ -225,10 +395,12 @@
         if (res.status === 404 || res.body.found === false) {
           stopPoll();
           document.getElementById('result').innerHTML =
-            '<div class="bg-white shadow-sm rounded p-5 text-center">' +
-              '<i class="bi bi-exclamation-circle" style="font-size:48px;color:#ff6b00"></i>' +
-              '<h4 class="fw-bold mt-3">No shipment found</h4>' +
-              '<p class="text-muted">We could not find a shipment with tracking number <strong>' + esc(id) + '</strong>. Please check the number and try again.</p>' +
+            '<div class="card-premium">' +
+              '<div class="card-pad text-center py-5">' +
+                '<i class="bi bi-exclamation-circle" style="font-size:56px;color:var(--brand-orange)"></i>' +
+                '<h4 class="fw-bold mt-3" style="color: var(--brand-navy);">No shipment found</h4>' +
+                '<p class="text-muted">We could not find a shipment with tracking number <strong>' + esc(id) + '</strong>. Please double-check and try again.</p>' +
+              '</div>' +
             '</div>';
           return;
         }
