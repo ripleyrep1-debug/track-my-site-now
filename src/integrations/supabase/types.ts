@@ -135,6 +135,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_exists: { Args: never; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -142,6 +143,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      lookup_tracking: { Args: { p_tracking_number: string }; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "user"
