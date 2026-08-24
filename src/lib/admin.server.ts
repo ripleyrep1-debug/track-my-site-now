@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { backendAdmin as supabaseAdmin } from "@/integrations/supabase/backend.server";
 
 export function getAdminDb() {
   return supabaseAdmin;

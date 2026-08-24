@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { backendAdmin as supabaseAdmin } from "@/integrations/supabase/backend.server";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
