@@ -14,8 +14,19 @@ export default defineConfig({
   },
   vite: {
     define: {
-      "import.meta.env.VITE_SUPABASE_URL": JSON.stringify("https://nzinjbsrwphopagskpln.supabase.co"),
-      "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify("sb_publishable_fm8zxWzNVy9JzFGsBwpfSA_oC-30jfC"),
+      // Backend URL/key come from the platform-injected env at build time.
+      // The URL falls back to the current project so published bundles are never blank.
+      "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(
+        process.env.VITE_SUPABASE_URL ||
+          process.env.SUPABASE_URL ||
+          "https://ytowmbamajcximjjegdi.supabase.co",
+      ),
+      "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
+        process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+          process.env.VITE_SUPABASE_ANON_KEY ||
+          process.env.SUPABASE_PUBLISHABLE_KEY ||
+          "",
+      ),
     },
   },
 });
