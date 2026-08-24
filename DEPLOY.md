@@ -60,16 +60,16 @@ project root:
 ```bash
 # Supabase
 wrangler secret put SUPABASE_URL
-# paste: https://nzinjbsrwphopagskpln.supabase.co
+# paste: https://ytowmbamajcximjjegdi.supabase.co
 
 wrangler secret put SUPABASE_PUBLISHABLE_KEY
-# paste: sb_publishable_fm8zxWzNVy9JzFGsBwpfSA_oC-30jfC
+# paste: <your new anon / publishable key>
 
 wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 # paste from Supabase dashboard → Project Settings → API → service_role
 ```
 
-> Get the service role key from https://supabase.com/dashboard/project/nzinjbsrwphopagskpln/settings/api
+> Get the service role key from https://supabase.com/dashboard/project/ytowmbamajcximjjegdi/settings/api
 
 ---
 
@@ -81,9 +81,9 @@ inlines them into the JS bundle:
 Create `.env.production`:
 
 ```
-VITE_SUPABASE_URL=https://nzinjbsrwphopagskpln.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_fm8zxWzNVy9JzFGsBwpfSA_oC-30jfC
-VITE_SUPABASE_PROJECT_ID=nzinjbsrwphopagskpln
+VITE_SUPABASE_URL=https://ytowmbamajcximjjegdi.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<your new anon / publishable key>
+VITE_SUPABASE_PROJECT_ID=ytowmbamajcximjjegdi
 VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_BROWSER_KEY=YOUR_OWN_GOOGLE_KEY_FROM_STEP_1
 VITE_LOVABLE_CONNECTOR_GOOGLE_MAPS_TRACKING_ID=
 ```
@@ -124,7 +124,7 @@ Done — `https://yourdomain.com` now serves the app.
 
 Supabase blocks redirects to unknown domains. Add yours:
 
-1. https://supabase.com/dashboard/project/nzinjbsrwphopagskpln/auth/url-configuration
+1. https://supabase.com/dashboard/project/ytowmbamajcximjjegdi/auth/url-configuration
 2. **Site URL** → `https://yourdomain.com`
 3. **Redirect URLs** → add `https://yourdomain.com/**`
 
