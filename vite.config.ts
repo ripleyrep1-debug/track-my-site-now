@@ -14,19 +14,16 @@ export default defineConfig({
   },
   vite: {
     define: {
-      // Backend URL/key come from the platform-injected env at build time.
-      // The URL falls back to the current project so published bundles are never blank.
+      // Backend is the ytowmbamajcximjjegdi project. The platform-injected
+      // SUPABASE_*/VITE_SUPABASE_* vars still point at the old deleted project,
+      // so these are pinned here (URL + publishable key are public values).
       "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(
-        process.env.VITE_SUPABASE_URL ||
-          process.env.SUPABASE_URL ||
-          "https://ytowmbamajcximjjegdi.supabase.co",
+        "https://ytowmbamajcximjjegdi.supabase.co",
       ),
       "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
-        process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-          process.env.VITE_SUPABASE_ANON_KEY ||
-          process.env.SUPABASE_PUBLISHABLE_KEY ||
-          "",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0b3dtYmFtYWpjeGltamplZ2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNTA3NjgsImV4cCI6MjA5MDYyNjc2OH0.6i8p5kPnLKyfiQm2LqhkVs646HVbB_4vWFO9vUlt_io",
       ),
+      "import.meta.env.VITE_SUPABASE_PROJECT_ID": JSON.stringify("ytowmbamajcximjjegdi"),
     },
   },
 });
