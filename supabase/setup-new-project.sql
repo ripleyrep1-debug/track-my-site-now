@@ -267,7 +267,10 @@ revoke execute on function public.has_role(uuid, public.app_role) from public, a
 revoke execute on function public.admin_exists() from public, anon, authenticated;
 revoke execute on function public.advance_auto_shipments() from public, anon, authenticated;
 revoke execute on function public.touch_updated_at() from public, anon, authenticated;
-revoke execute on function public.lookup_tracking(text) from public, anon, authenticated;
+-- Public tracking lookup: read-only, scoped to one tracking number, returns no
+-- internal ids. Static hosting (Hostinger) calls this RPC directly.
+grant execute on function public.lookup_tracking(text) to anon, authenticated;
+
 
 -- ---------- 15-minute auto-progress schedule --------------------------
 create extension if not exists pg_cron with schema extensions;
