@@ -459,6 +459,31 @@
     el.innerHTML = html; el.style.display = 'block';
   }
 
+  // Backend (Supabase) — used directly when the site is hosted statically
+  // (Hostinger), where /api/public/track does not exist.
+  var SB_URL = 'https://ytowmbamajcximjjegdi.supabase.co';
+  var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0b3dtYmFtYWpjeGltamplZ2RpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNTA3NjgsImV4cCI6MjA5MDYyNjc2OH0.6i8p5kPnLKyfiQm2LqhkVs646HVbB_4vWFO9vUlt_io';
+
+  function fetchDirect(id) {
+    return fetch(SB_URL + '/rest/v1/rpc/lookup_tracking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY },
+      body: JSON.stringify({ p_tracking_number: id })
+    }).then(function (r) {
+      return r.json().then(function (j) { return { ok: r.ok && !j.error, status: r.status, body: j || {} }; });
+    });
+  }
+
+  function fetchTracking(id) {
+    return fetch('/api/public/track?id=' + encodeURIComponent(id))
+      .then(function (r) {
+        if (!r.ok && (r.status === 404 || r.status === 405 || r.status >= 500)) return fetchDirect(id);
+        return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; })
+          .catch(function () { return fetchDirect(id); });
+      })
+      .catch(function () { return fetchDirect(id); });
+  }
+
   function lookup(id, silent) {
     if (!silent) {
       document.getElementById('empty').style.display = 'none';
@@ -466,8 +491,8 @@
         setStatus('<div class="text-muted small"><i class="bi bi-hourglass-split"></i> Looking up ' + esc(id) + '…</div>');
       }
     }
-    fetch('/api/public/track?id=' + encodeURIComponent(id))
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
+    fetchTracking(id)
+
       .then(function (res) {
         setStatus('');
         if (res.body.found === false) {
